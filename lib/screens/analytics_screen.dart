@@ -391,18 +391,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     )
                   else
                     BalanceChart(bars: bars, candle: _anCandle, ma: _ma, zoom: _zoom),
-                  if (bars.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _ohlc('Откр.', bars.first.open),
-                        _ohlc('Макс.', bars.map((b) => b.high).reduce((a, b) => a > b ? a : b)),
-                        _ohlc('Мин.', bars.map((b) => b.low).reduce((a, b) => a < b ? a : b)),
-                        _ohlc('Закр.', bars.last.close),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -760,16 +748,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
-
-  Widget _ohlc(String label, double value) => Column(
-        children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.mutedLight)),
-          FittedBox(
-            child: Text(fmtMoney(value),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      );
 
   Widget _smallStat(String label, String value, Color color) => Container(
         padding: const EdgeInsets.all(8),

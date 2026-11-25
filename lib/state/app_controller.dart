@@ -7,6 +7,7 @@ import '../models/app_state.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/state_service.dart';
+import '../services/telegram_service.dart';
 
 /// Контроллер приложения — аналог глобального state + recalc() + синхронизации из HTML.
 class AppController extends ChangeNotifier {
@@ -38,6 +39,15 @@ class AppController extends ChangeNotifier {
   bool _authenticated = false;
   bool get authenticated => _authenticated;
 
+  /// Приложение открыто внутри Telegram Mini App.
+  bool get inTelegram => readTelegramInfo() != null;
+
+  String? _telegramError;
+  String? get telegramError => _telegramError;
+
+  bool _telegramLinked = false;
+  bool get telegramLinked => _telegramLinked;
+
   /// Результат пересчёта (аналог R из HTML).
   CalcResult _calc = CalcResult.empty();
   CalcResult get calc => _calc;
@@ -67,6 +77,7 @@ class AppController extends ChangeNotifier {
         _state = _loadGuestState();
       }
       _recalc();
+      if (_authenticated) _autoLinkTelegram();
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -91,6 +102,7 @@ class AppController extends ChangeNotifier {
       if (loaded == null) await _stateService.save(_state);
       _recalc();
       notifyListeners();
+      _autoLinkTelegram();
       return true;
     } catch (_) {
       return false;
@@ -117,6 +129,51 @@ class AppController extends ChangeNotifier {
     _state = AppState.empty();
     _recalc();
     notifyListeners();
+  }
+
+  void _autoLinkTelegram() {
+    if (!inTelegram) return;
+    linkTelegram();
+  }
+
+  /// Привязать текущий аккаунт к Telegram (как в HTML-версии).
+  /// Возвращает null при успехе, иначе текст ошибки.
+  Future<String?> linkTelegram() async {
+    if (!_authenticated) return 'Сначала войдите в аккаунт';
+    final info = readTelegramInfo();
+    if (info == null) return 'Откройте приложение через бота Telegram';
+    try {
+      final res = await _api.post('/api/telegram/link', {'initData': info.initData});
+      final body = _json(res.body);
+      if (res.statusCode >= 200 && res.statusCode < 300 && body['error'] == null) {
+        _telegramLinked = true;
+        _telegramError = null;
+        notifyListeners();
+        return null;
+      }
+      _telegramError = body['error']?.toString() ?? 'Не удалось привязать Telegram';
+      notifyListeners();
+      return _telegramError;
+    } catch (e) {
+      _telegramError = e.toString();
+      notifyListeners();
+      return _telegramError;
+    }
+  }
+
+  /// Отправить тестовое сообщение в привязанный Telegram.
+  Future<String?> testTelegram() async {
+    if (!_authenticated) return 'Сначала войдите в аккаунт';
+    try {
+      final res = await _api.post('/api/telegram/test');
+      final body = _json(res.body);
+      if (res.statusCode >= 200 && res.statusCode < 300 && body['error'] == null) {
+        return null;
+      }
+      return body['error']?.toString() ?? 'Не удалось отправить сообщение';
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   /// Показать экран входа из гостевого режима, не теряя сохранённые данные.
@@ -490,7 +547,18 @@ class CalcResult {
 class DailyPoint {
   final String date;
   final double balance;
-  DailyPoint({required this.date, required this.balance});
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  DailyPoint({
+    required this.date,
+    required this.balance,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+  });
 }
 
 CalcResult recalc(AppState s) {
@@ -516,8 +584,19 @@ CalcResult recalc(AppState s) {
   }
 
   final points = <DailyPoint>[];
+  var prevBal = s.startCash + s.startCushion - debts;
 
   for (final e in entries) {
+    final open = prevBal;
+    var high = open;
+    var low = open;
+
+    void touch() {
+      final b = cash + cushion + savings - debts;
+      if (b > high) high = b;
+      if (b < low) low = b;
+    }
+
     if (e.type == 'debt') {
       final d = s.debts.where((x) => x.id == e.debtId).firstOrNull;
       if (d != null) {
@@ -527,33 +606,49 @@ CalcResult recalc(AppState s) {
         } else {
           debts += amt;
         }
+        touch();
       }
     } else {
       income += e.income;
       cash += e.income;
+      touch();
       for (final v in e.expenses.values) {
         expenses += v;
         cash -= v;
+        touch();
       }
       for (final v in e.savings.values) {
         savings += v;
         cash -= v;
+        touch();
       }
       for (final v in e.savSpend.values) {
         savings -= v;
         cash += v;
+        touch();
       }
       for (final v in e.debtPays.values) {
         debts -= v;
         cash -= v;
+        touch();
       }
       cushion += e.cushIn;
       cushion -= e.cushOut;
       if (e.cushOut > 0) {
         cash += e.cushOut;
       }
+      touch();
     }
-    points.add(DailyPoint(date: e.date, balance: cash + cushion + savings - debts));
+    final close = cash + cushion + savings - debts;
+    points.add(DailyPoint(
+      date: e.date,
+      balance: close,
+      open: open,
+      high: high,
+      low: low,
+      close: close,
+    ));
+    prevBal = close;
   }
 
   final balance = cash + cushion + savings - debts;

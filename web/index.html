@@ -10,39 +10,48 @@
 
     For more details:
     * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="BitBalance — финансовый пульт">
 
-  <!--
-    Uncomment the tag below to lay the app out underneath the parts of the
-    screen that the device obstructs, such as a display cutout, the rounded
-    corners of the screen, or a home indicator.
-
-    Without it, the browser keeps the app clear of them, and `SafeArea` and
-    `MediaQuery.paddingOf` report no padding. With it, the app covers the whole
-    screen, and it is up to the app to keep its own content out of the way,
-    which is what `SafeArea` is for.
-  -->
-  <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="balance_tg_flutter">
+  <meta name="apple-mobile-web-app-title" content="BitBalance">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>balance_tg_flutter</title>
+  <title>BitBalance</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Telegram Mini App: тот же API, что использовала HTML-версия. -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (tg) {
+        try { tg.ready(); tg.expand(); } catch (e) {}
+        if (tg.themeParams && tg.themeParams.bg_color) {
+          document.body.style.background = tg.themeParams.bg_color;
+        }
+      }
+      window.__bbTgInfo = function () {
+        if (!tg) return '';
+        return JSON.stringify({
+          initData: tg.initData || '',
+          user: (tg.initDataUnsafe && tg.initDataUnsafe.user) || null,
+          platform: tg.platform || ''
+        });
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--
@@ -51,7 +60,7 @@
     or to give the user feedback during the initialization process.
 
     For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
+    * https://flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
 </body>

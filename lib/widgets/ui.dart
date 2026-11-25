@@ -5,6 +5,16 @@ String fmtMoney(double v) => v
     .toStringAsFixed(0)
     .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ');
 
+/// Короткие подписи для осей графика и легенды OHLC.
+String fmtCompact(double v) {
+  final sign = v < 0 ? '−' : '';
+  final a = v.abs();
+  if (a >= 1000000000) return '$sign${(a / 1000000000).toStringAsFixed(1)}B';
+  if (a >= 1000000) return '$sign${(a / 1000000).toStringAsFixed(2)}M';
+  if (a >= 1000) return '$sign${(a / 1000).toStringAsFixed(a >= 100000 ? 0 : 1)}k';
+  return '$sign${a.toStringAsFixed(0)}';
+}
+
 class ScreenHeader extends StatelessWidget {
   final String eyebrow;
   final String title;

@@ -73,6 +73,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _tgResult(String? error, String okText) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error ?? okText)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = c.state;
@@ -219,6 +226,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                     (v) => c.updateSetting((x) => x.tzOffset = double.tryParse(v)),
                   ),
+                  const SizedBox(height: 8),
+                  if (c.inTelegram)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async =>
+                                _tgResult(await c.linkTelegram(), 'Telegram привязан'),
+                            icon: const Icon(Icons.link, size: 16),
+                            label: const Text('Привязать'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async =>
+                                _tgResult(await c.testTelegram(), 'Сообщение отправлено'),
+                            icon: const Icon(Icons.send, size: 16),
+                            label: const Text('Тест'),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    const Text(
+                      'Откройте приложение через бота Telegram, чтобы привязать уведомления.',
+                      style: TextStyle(fontSize: 11, color: AppTheme.mutedLight),
+                    ),
+                  if (c.telegramError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        c.telegramError!,
+                        style: const TextStyle(fontSize: 11, color: AppTheme.danger),
+                      ),
+                    ),
                 ],
               ),
             ),
