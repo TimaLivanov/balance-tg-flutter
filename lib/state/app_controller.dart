@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/push_service.dart';
 import '../services/state_service.dart';
 import '../services/telegram_service.dart';
+import '../widgets/ui.dart' show fmtMoney;
 
 /// Контроллер приложения — аналог глобального state + recalc() + синхронизации из HTML.
 class AppController extends ChangeNotifier {
@@ -269,6 +270,7 @@ class AppController extends ChangeNotifier {
 
   void addCategory(
     String name, {
+    String icon = '',
     required bool need,
     required bool rare,
     double plan = 0,
@@ -279,6 +281,7 @@ class AppController extends ChangeNotifier {
       Category(
         id: id,
         name: name.trim().isEmpty ? 'Категория' : name.trim(),
+        icon: icon,
         need: need,
         rare: rare,
         plan: plan > 0 ? Plan(amount: plan, date: planDate) : null,
@@ -290,6 +293,7 @@ class AppController extends ChangeNotifier {
   void updateCategory(
     String id, {
     String? name,
+    String? icon,
     bool? need,
     bool? rare,
     bool? archived,
@@ -302,6 +306,7 @@ class AppController extends ChangeNotifier {
     _state.cats[idx] = Category(
       id: c.id,
       name: name ?? c.name,
+      icon: icon ?? c.icon,
       need: need ?? c.need,
       rare: rare ?? c.rare,
       archived: archived ?? c.archived,
@@ -703,6 +708,12 @@ class DailyPoint {
   final double high;
   final double low;
   final double close;
+
+  /// Операции внутри дня в формате «подпись: сумма» (как buildBars в HTML).
+  final List<String> ops;
+  final double income;
+  final double expense;
+
   DailyPoint({
     required this.date,
     required this.balance,
@@ -710,6 +721,9 @@ class DailyPoint {
     required this.high,
     required this.low,
     required this.close,
+    this.ops = const [],
+    this.income = 0,
+    this.expense = 0,
   });
 }
 
@@ -827,11 +841,18 @@ CalcResult recalc(AppState s) {
     final open = prevBal;
     var high = open;
     var low = open;
+    final ops = <String>[];
+    var dayIncome = 0.0;
+    var dayExpense = 0.0;
 
     void touch() {
       final b = cash + cushion + savings - debts;
       if (b > high) high = b;
       if (b < low) low = b;
+    }
+
+    void op(String label, double delta) {
+      ops.add('$label: ${delta >= 0 ? '+' : '−'}${fmtMoney(delta.abs())} ₽');
     }
 
     if (e.type == 'debt') {
@@ -843,41 +864,56 @@ CalcResult recalc(AppState s) {
         // Галочка «деньги уже получил» добавляет копилку, но долг остаётся.
         if (e.creditCash) cash += amt;
         debts = debtSum();
+        op('долг «${d.name}»', amt);
+        if (e.creditCash) op('в копилку из долга', amt);
         touch();
       }
     } else {
       income += e.income;
+      dayIncome += e.income;
       cash += e.income;
+      if (e.income > 0) op('Доход', e.income);
       touch();
-      for (final v in e.expenses.values) {
+      e.expenses.forEach((id, v) {
+        final cat = s.cats.where((x) => x.id == id).firstOrNull;
         expenses += v;
+        dayExpense += v;
         cash -= v;
+        op(cat?.name ?? 'расход', -v);
         touch();
-      }
-      for (final v in e.savings.values) {
+      });
+      e.savings.forEach((id, v) {
+        final goal = s.savings.where((x) => x.id == id).firstOrNull;
         savings += v;
         cash -= v;
+        op('копилка → «${goal?.name ?? 'накопление'}»', -v);
         touch();
-      }
-      for (final v in e.savSpend.values) {
+      });
+      e.savSpend.forEach((id, v) {
         savings -= v;
         cash += v;
+        op('из накоплений', v);
         touch();
-      }
+      });
       e.debtPays.forEach((id, v) {
         final available = debtBal[id] ?? 0;
         final pay = v < available ? v : available;
         if (pay <= 0) return;
+        final d = s.debts.where((x) => x.id == id).firstOrNull;
         debtBal[id] = available - pay;
         debtPaid += pay;
+        dayExpense += pay;
         cash -= pay;
         debts = debtSum();
+        op('→ долг «${d?.name ?? ''}»', -pay);
         touch();
       });
       cushion += e.cushIn;
       cushion -= e.cushOut;
+      if (e.cushIn > 0) op('копилка → подушка', -e.cushIn);
       if (e.cushOut > 0) {
         cash += e.cushOut;
+        op('подушка → копилка', e.cushOut);
       }
       touch();
     }
@@ -890,6 +926,9 @@ CalcResult recalc(AppState s) {
         high: high,
         low: low,
         close: close,
+        ops: ops,
+        income: dayIncome,
+        expense: dayExpense,
       ),
     );
     prevBal = close;

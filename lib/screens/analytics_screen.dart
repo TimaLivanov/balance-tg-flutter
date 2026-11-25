@@ -350,612 +350,589 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       c.state.debts.where((d) => !d.archived).toList(),
     );
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          key: const PageStorageKey('analytics-scroll'),
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppScrollView(
+      storageKey: 'analytics-scroll',
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenHeader(
+            eyebrow: 'Аналитика',
+            title: 'Цифры и тренды',
+            subtitle: 'Здоровье денег, графики и прогнозы',
+          ),
+          const SizedBox(height: 20),
+          Row(
             children: [
-              ScreenHeader(
-                eyebrow: 'Аналитика',
-                title: 'Цифры и тренды',
-                subtitle: 'Здоровье денег, графики и прогнозы',
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Text('Период', style: TextStyle(fontSize: 13)),
-                  const SizedBox(width: 10),
-                  DropdownButton<int>(
-                    value: _period,
-                    items: const [
-                      DropdownMenuItem(value: 7, child: Text('7 дней')),
-                      DropdownMenuItem(value: 30, child: Text('30 дней')),
-                      DropdownMenuItem(value: 90, child: Text('90 дней')),
-                      DropdownMenuItem(value: 365, child: Text('Год')),
-                      DropdownMenuItem(value: 9999, child: Text('Всё время')),
-                    ],
-                    onChanged: (v) => setState(() => _period = v ?? 30),
-                  ),
+              const Text('Период', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 10),
+              DropdownButton<int>(
+                value: _period,
+                items: const [
+                  DropdownMenuItem(value: 7, child: Text('7 дней')),
+                  DropdownMenuItem(value: 30, child: Text('30 дней')),
+                  DropdownMenuItem(value: 90, child: Text('90 дней')),
+                  DropdownMenuItem(value: 365, child: Text('Год')),
+                  DropdownMenuItem(value: 9999, child: Text('Всё время')),
                 ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: _bigMetric('Доход', inc, AppTheme.success)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _bigMetric('Траты', exp, AppTheme.danger)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _bigMetric(
-                      'Итог',
-                      net,
-                      net >= 0 ? AppTheme.success : AppTheme.danger,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Дней с записями: $days · на долги ушло ${fmtMoney(t.paid)} ₽',
-                style: TextStyle(fontSize: 12, color: AppTheme.muted),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Здоровье денег',
-                subtitle: 'Пороги из настроек',
-                child: Column(
-                  children: [
-                    _healthRow(
-                      'Обязательные расходы',
-                      inc > 0
-                          ? '${(exp / inc * 100).toStringAsFixed(0)}% · не выше ${health.needsMax}%'
-                          : 'нет данных',
-                      inc > 0 && exp / inc * 100 <= health.needsMax,
-                    ),
-                    _healthRow(
-                      'Остаток после трат',
-                      inc > 0
-                          ? '${(net / inc * 100).toStringAsFixed(0)}% · не ниже ${health.saveMin}%'
-                          : 'нет данных',
-                      inc > 0 && net / inc * 100 >= health.saveMin,
-                    ),
-                    _healthRow(
-                      'Запас прочности',
-                      exp > 0
-                          ? '${((c.calc.cash + c.calc.cushion) / (exp / (days == 0 ? 1 : days))).toStringAsFixed(0)} дн. · не меньше ${health.runwayMin}'
-                          : 'нет данных',
-                      exp > 0 &&
-                          (c.calc.cash + c.calc.cushion) /
-                                  (exp / (days == 0 ? 1 : days)) >=
-                              health.runwayMin,
-                    ),
-                    _healthRow(
-                      'Долги',
-                      !debtOpen
-                          ? 'нет'
-                          : monthsToFree != null && monthsToFree <= 60
-                          ? 'осталось ${fmtMoney(c.calc.debtTotal)} ₽ · закроются за ${(monthsToFree).ceil()} мес.'
-                          : 'осталось ${fmtMoney(c.calc.debtTotal)} ₽ · при потоке не закроются',
-                      !debtOpen ||
-                          (monthsToFree != null &&
-                              monthsToFree <= health.debtMonths),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Платежи по долгам',
-                subtitle: debtOpen
-                    ? 'осталось вернуть ${fmtMoney(c.calc.debtTotal)} ₽ · '
-                          'мин. ${fmtRec(debtMinSum(c.state, c.calc))} ₽ / день'
-                    : 'Активных долгов нет',
-                child: !debtOpen
-                    ? const Text(
-                        '✅ Долгов нет. Укрепите подушку и накопления.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.success),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ...openDebts.map((d) {
-                            final rec = debtRec(c.state, c.calc, d);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          d.name,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        Text(
-                                          'остаток ${fmtMoney(rec.remain)} ₽ из ${fmtMoney(d.amount)} ₽'
-                                          '${d.due.isNotEmpty ? ' · до ${fmtDateRu(d.due)}' : ''}'
-                                          '${rec.overdue ? ' · срок прошёл' : ''}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.muted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (rec.perDay != null && rec.perDay! > 0)
-                                    Text(
-                                      'рек. ${fmtRec(rec.perDay!)} ₽/день',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.primary,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          }),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Рек. платёж = остаток ÷ дни до срока.',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppTheme.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'График баланса',
-                subtitle: 'MA 7/25 — скользящие средние по закрытию',
-                action: TextButton(
-                  onPressed: () => setState(() => _ma = !_ma),
-                  child: Text(
-                    'MA',
-                    style: TextStyle(
-                      color: _ma ? AppTheme.warning : AppTheme.muted,
-                    ),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        for (final label in ['День', 'Нед', 'Мес', 'Год'])
-                          _pill(
-                            label,
-                            _anTf == _anTfKey(label),
-                            () => setState(() => _anTf = _anTfKey(label)),
-                          ),
-                        _pill(
-                          'Свечи',
-                          _anCandle,
-                          () => setState(() => _anCandle = true),
-                        ),
-                        _pill(
-                          'Линия',
-                          !_anCandle,
-                          () => setState(() => _anCandle = false),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Text(
-                        'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
-                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const SizedBox(height: 10),
-                    if (bars.isEmpty)
-                      SizedBox(
-                        height: 180,
-                        child: Center(
-                          child: Text(
-                            'Проведите день, чтобы увидеть график',
-                            style: TextStyle(color: AppTheme.muted),
-                          ),
-                        ),
-                      )
-                    else
-                      BalanceChart(bars: bars, candle: _anCandle, ma: _ma),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: '🔥 Тепловая карта · обязательные',
-                subtitle: 'Размер — сумма последнего пополнения. Цвет — % к предыдущему пополнению этой же категории (1000→1200 = +20%). Красный = выросло, зелёный = снизилось.',
-                child: heat.isEmpty
-                    ? Text(
-                        'Нет обязательных категорий с тратами за период',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                      )
-                    : Heatmap(items: heat),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Главное',
-                subtitle: 'Краткие выводы по цифрам',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _insight('Баланс', '${fmtMoney(c.calc.balance)} ₽'),
-                    _insight('Доход в день', '${fmtMoney(avgInc)} ₽'),
-                    _insight(
-                      'Траты в день',
-                      '${fmtMoney(days == 0 ? 0 : exp / days)} ₽',
-                    ),
-                    _insight('Остаток до долгов', '${fmtMoney(net)} ₽'),
-                    if (debtOpen && netDay > 0)
-                      _insight(
-                        'Долги закроются через',
-                        '${(c.calc.debtTotal / netDay).ceil()} дн. '
-                            '(≈ ${monthsToFree?.ceil() ?? 0} мес.)',
-                      )
-                    else if (debtOpen)
-                      _insight(
-                        'Долги',
-                        'остаток в день отрицательный — долги не уменьшаются',
-                      ),
-                    if (expBy.isNotEmpty)
-                      _insight(
-                        'Больше всего уходит на',
-                        '${expBy.first.key}: ${fmtMoney(expBy.first.value)} ₽ '
-                            '(${exp > 0 ? (expBy.first.value / exp * 100).round() : 0}% трат)',
-                      ),
-                    _insight(
-                      'Прогноз на 30 дней',
-                      '${fmtMoney(c.calc.balance + netDay * 30)} ₽',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Совет дня',
-                child: Text(_tip, style: const TextStyle(fontSize: 13)),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'AI-советник',
-                subtitle: 'Задай вопрос о своих финансах',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _question,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: 'Например: что урезать в первую очередь?',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.icon(
-                        onPressed: _aiLoading ? null : _ask,
-                        icon: _aiLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.send),
-                        label: const Text('Спросить'),
-                      ),
-                    ),
-                    if (_chat.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 8),
-                      ..._chat.map((m) => _chatBubble(m)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Память ИИ',
-                subtitle: 'Персональные заметки для ИИ',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _memory,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Например: коплю на машину, цель 500000 ₽ к декабрю.',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        FilledButton(
-                          onPressed: () async {
-                            final r = await c.saveAiMemory(_memory.text);
-                            if (!mounted) return;
-                            setState(() => _memoryStatus = r);
-                          },
-                          child: const Text('Сохранить память'),
-                        ),
-                        OutlinedButton(
-                          onPressed: () async {
-                            final r = await c.clearAiMemory();
-                            if (!mounted) return;
-                            setState(() {
-                              _memory.text = '';
-                              _memoryStatus = r;
-                            });
-                          },
-                          child: const Text('Очистить'),
-                        ),
-                        TextButton(
-                          onPressed: _loadHistory,
-                          child: const Text('Обновить историю'),
-                        ),
-                      ],
-                    ),
-                    if (_memoryStatus.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _memoryStatus,
-                        style: TextStyle(fontSize: 11, color: AppTheme.muted),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Рабочие и выходные',
-                subtitle: 'Рабочий день — с доходом, выходной — прошедший день без дохода',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _smallStat(
-                            'Рабочих / 90 дн.',
-                            '${work['work']}',
-                            AppTheme.success,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _smallStat(
-                            'Выходных / 90 дн.',
-                            '${work['off']}',
-                            AppTheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _smallStat(
-                            'Ср. раб. в мес.',
-                            '~${((work['work'] as int) / 3).round()}',
-                            AppTheme.text,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _smallStat(
-                            'Ср. вых. в мес.',
-                            '~${((work['off'] as int) / 3).round()}',
-                            AppTheme.text,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Выходные по дням недели (за 90 дн.)',
-                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      children: List.generate(7, (i) {
-                        final active =
-                            i == work['maxI'] && (work['maxOff'] as int) > 0;
-                        final names = [
-                          'пн',
-                          'вт',
-                          'ср',
-                          'чт',
-                          'пт',
-                          'сб',
-                          'вс',
-                        ];
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: active
-                                ? AppTheme.warning.withValues(alpha: .14)
-                                : AppTheme.bg,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${names[i]}: ${(work['offByDow'] as List<int>)[i]}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: active ? AppTheme.warning : AppTheme.muted,
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 8),
-                    if ((work['maxOff'] as int) > 0)
-                      Text(
-                        'Чаще всего выходной: ${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][work['maxI'] as int]} '
-                        '(${work['maxOff']} раз).'
-                        '${work['next'] != null ? ' Ближайший такой день: ${_dateRu(work['next'] as DateTime)}.' : ''}',
-                        style: const TextStyle(fontSize: 12),
-                      )
-                    else
-                      Text(
-                        'Мало данных для прогноза выходного.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Как выйти в плюс',
-                subtitle: 'План по долгам к выбранной дате',
-                action: TextButton.icon(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _plusDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 3650)),
-                    );
-                    if (picked != null) setState(() => _plusDate = picked);
-                  },
-                  icon: const Icon(Icons.event, size: 16),
-                  label: Text(_dateRu(_plusDate)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Цель: к ${_dateRu(_plusDate)} ($dLeft дн.)',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    if (c.calc.debtTotal <= 0)
-                      const Text(
-                        '✅ Долгов нет. Укрепите подушку и накопления.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.success),
-                      )
-                    else ...[
-                      Text(
-                        'Нужно направлять на долги ≈ ${fmtMoney(needPerDay)} ₽/день, '
-                        'сейчас поток ≈ ${fmtMoney(netDay)} ₽/день.',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        gap > 0.004
-                            ? 'Не хватает ≈ ${fmtMoney(gap)} ₽/день до плана.'
-                            : 'Текущего потока хватает, если держать темп.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: gap > 0.004
-                              ? AppTheme.warning
-                              : AppTheme.success,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Text(
-                      'Что сделать (обязательные не трогаем):',
-                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
-                    ),
-                    const SizedBox(height: 4),
-                    if (ideas.isEmpty)
-                      Text(
-                        'Пока мало необязательных трат — заведите учёт «хотелок» отдельно.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                      )
-                    else
-                      ...ideas.map(
-                        (x) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            '• $x',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Расходы по категориям',
-                subtitle: exp > 0
-                    ? 'Всего ${fmtMoney(exp)} ₽ · $modeLabel'
-                    : 'нет данных',
-                action: TextButton(
-                  onPressed: () =>
-                      setState(() => _expModeIncome = !_expModeIncome),
-                  child: Text(
-                    _expModeIncome ? 'доля от дохода' : 'доля от трат',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-                child: expBy.isEmpty
-                    ? const _NoData()
-                    : Column(
-                        children: expBy.take(10).map((e) {
-                          final base = _expModeIncome ? inc : exp;
-                          final pct = base > 0 ? e.value / base : 0.0;
-                          return _barRow(e.key, e.value, pct, e.value / maxExp);
-                        }).toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Доходы по категориям',
-                subtitle: inc > 0 ? 'Всего ${fmtMoney(inc)} ₽' : 'нет данных',
-                child: incBy.isEmpty
-                    ? const _NoData()
-                    : Column(
-                        children: incBy.map((e) {
-                          final pct = inc > 0 ? e.value / inc : 0.0;
-                          return _barRow(
-                            e.key,
-                            e.value,
-                            pct,
-                            e.value / maxInc,
-                            green: true,
-                          );
-                        }).toList(),
-                      ),
+                onChanged: (v) => setState(() => _period = v ?? 30),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _bigMetric('Доход', inc, AppTheme.success)),
+              const SizedBox(width: 8),
+              Expanded(child: _bigMetric('Траты', exp, AppTheme.danger)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _bigMetric(
+                  'Итог',
+                  net,
+                  net >= 0 ? AppTheme.success : AppTheme.danger,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Дней с записями: $days · на долги ушло ${fmtMoney(t.paid)} ₽',
+            style: TextStyle(fontSize: 12, color: AppTheme.muted),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Здоровье денег',
+            subtitle: 'Пороги из настроек',
+            child: Column(
+              children: [
+                _healthRow(
+                  'Обязательные расходы',
+                  inc > 0
+                      ? '${(exp / inc * 100).toStringAsFixed(0)}% · не выше ${health.needsMax}%'
+                      : 'нет данных',
+                  inc > 0 && exp / inc * 100 <= health.needsMax,
+                ),
+                _healthRow(
+                  'Остаток после трат',
+                  inc > 0
+                      ? '${(net / inc * 100).toStringAsFixed(0)}% · не ниже ${health.saveMin}%'
+                      : 'нет данных',
+                  inc > 0 && net / inc * 100 >= health.saveMin,
+                ),
+                _healthRow(
+                  'Запас прочности',
+                  exp > 0
+                      ? '${((c.calc.cash + c.calc.cushion) / (exp / (days == 0 ? 1 : days))).toStringAsFixed(0)} дн. · не меньше ${health.runwayMin}'
+                      : 'нет данных',
+                  exp > 0 &&
+                      (c.calc.cash + c.calc.cushion) /
+                              (exp / (days == 0 ? 1 : days)) >=
+                          health.runwayMin,
+                ),
+                _healthRow(
+                  'Долги',
+                  !debtOpen
+                      ? 'нет'
+                      : monthsToFree != null && monthsToFree <= 60
+                      ? 'осталось ${fmtMoney(c.calc.debtTotal)} ₽ · закроются за ${(monthsToFree).ceil()} мес.'
+                      : 'осталось ${fmtMoney(c.calc.debtTotal)} ₽ · при потоке не закроются',
+                  !debtOpen ||
+                      (monthsToFree != null &&
+                          monthsToFree <= health.debtMonths),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Платежи по долгам',
+            subtitle: debtOpen
+                ? 'осталось вернуть ${fmtMoney(c.calc.debtTotal)} ₽ · '
+                      'мин. ${fmtRec(debtMinSum(c.state, c.calc))} ₽ / день'
+                : 'Активных долгов нет',
+            child: !debtOpen
+                ? const Text(
+                    '✅ Долгов нет. Укрепите подушку и накопления.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.success),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...openDebts.map((d) {
+                        final rec = debtRec(c.state, c.calc, d);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      d.name,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      'остаток ${fmtMoney(rec.remain)} ₽ из ${fmtMoney(d.amount)} ₽'
+                                      '${d.due.isNotEmpty ? ' · до ${fmtDateRu(d.due)}' : ''}'
+                                      '${rec.overdue ? ' · срок прошёл' : ''}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (rec.perDay != null && rec.perDay! > 0)
+                                Text(
+                                  'рек. ${fmtRec(rec.perDay!)} ₽/день',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Рек. платёж = остаток ÷ дни до срока.',
+                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'График баланса',
+            subtitle: 'MA 7/25 — скользящие средние по закрытию',
+            action: TextButton(
+              onPressed: () => setState(() => _ma = !_ma),
+              child: Text(
+                'MA',
+                style: TextStyle(
+                  color: _ma ? AppTheme.warning : AppTheme.muted,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final label in ['День', 'Нед', 'Мес', 'Год'])
+                      _pill(
+                        label,
+                        _anTf == _anTfKey(label),
+                        () => setState(() => _anTf = _anTfKey(label)),
+                      ),
+                    _pill(
+                      'Свечи',
+                      _anCandle,
+                      () => setState(() => _anCandle = true),
+                    ),
+                    _pill(
+                      'Линия',
+                      !_anCandle,
+                      () => setState(() => _anCandle = false),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
+                    style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const SizedBox(height: 10),
+                if (bars.isEmpty)
+                  SizedBox(
+                    height: 180,
+                    child: Center(
+                      child: Text(
+                        'Проведите день, чтобы увидеть график',
+                        style: TextStyle(color: AppTheme.muted),
+                      ),
+                    ),
+                  )
+                else
+                  BalanceChart(bars: bars, candle: _anCandle, ma: _ma),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: '🔥 Тепловая карта · обязательные',
+            subtitle: 'Размер — сумма последнего пополнения. Цвет — % к предыдущему пополнению этой же категории (1000→1200 = +20%). Красный = выросло, зелёный = снизилось.',
+            child: heat.isEmpty
+                ? Text(
+                    'Нет обязательных категорий с тратами за период',
+                    style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                  )
+                : Heatmap(items: heat),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Главное',
+            subtitle: 'Краткие выводы по цифрам',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _insight('Баланс', '${fmtMoney(c.calc.balance)} ₽'),
+                _insight('Доход в день', '${fmtMoney(avgInc)} ₽'),
+                _insight(
+                  'Траты в день',
+                  '${fmtMoney(days == 0 ? 0 : exp / days)} ₽',
+                ),
+                _insight('Остаток до долгов', '${fmtMoney(net)} ₽'),
+                if (debtOpen && netDay > 0)
+                  _insight(
+                    'Долги закроются через',
+                    '${(c.calc.debtTotal / netDay).ceil()} дн. '
+                        '(≈ ${monthsToFree?.ceil() ?? 0} мес.)',
+                  )
+                else if (debtOpen)
+                  _insight(
+                    'Долги',
+                    'остаток в день отрицательный — долги не уменьшаются',
+                  ),
+                if (expBy.isNotEmpty)
+                  _insight(
+                    'Больше всего уходит на',
+                    '${expBy.first.key}: ${fmtMoney(expBy.first.value)} ₽ '
+                        '(${exp > 0 ? (expBy.first.value / exp * 100).round() : 0}% трат)',
+                  ),
+                _insight(
+                  'Прогноз на 30 дней',
+                  '${fmtMoney(c.calc.balance + netDay * 30)} ₽',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Совет дня',
+            child: Text(_tip, style: const TextStyle(fontSize: 13)),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'AI-советник',
+            subtitle: 'Задай вопрос о своих финансах',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _question,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    hintText: 'Например: что урезать в первую очередь?',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: _aiLoading ? null : _ask,
+                    icon: _aiLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send),
+                    label: const Text('Спросить'),
+                  ),
+                ),
+                if (_chat.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  ..._chat.map((m) => _chatBubble(m)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Память ИИ',
+            subtitle: 'Персональные заметки для ИИ',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _memory,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Например: коплю на машину, цель 500000 ₽ к декабрю.',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: () async {
+                        final r = await c.saveAiMemory(_memory.text);
+                        if (!mounted) return;
+                        setState(() => _memoryStatus = r);
+                      },
+                      child: const Text('Сохранить память'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () async {
+                        final r = await c.clearAiMemory();
+                        if (!mounted) return;
+                        setState(() {
+                          _memory.text = '';
+                          _memoryStatus = r;
+                        });
+                      },
+                      child: const Text('Очистить'),
+                    ),
+                    TextButton(
+                      onPressed: _loadHistory,
+                      child: const Text('Обновить историю'),
+                    ),
+                  ],
+                ),
+                if (_memoryStatus.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _memoryStatus,
+                    style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Рабочие и выходные',
+            subtitle: 'Рабочий день — с доходом, выходной — прошедший день без дохода',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _smallStat(
+                        'Рабочих / 90 дн.',
+                        '${work['work']}',
+                        AppTheme.success,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _smallStat(
+                        'Выходных / 90 дн.',
+                        '${work['off']}',
+                        AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _smallStat(
+                        'Ср. раб. в мес.',
+                        '~${((work['work'] as int) / 3).round()}',
+                        AppTheme.text,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _smallStat(
+                        'Ср. вых. в мес.',
+                        '~${((work['off'] as int) / 3).round()}',
+                        AppTheme.text,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Выходные по дням недели (за 90 дн.)',
+                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: List.generate(7, (i) {
+                    final active =
+                        i == work['maxI'] && (work['maxOff'] as int) > 0;
+                    final names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? AppTheme.warning.withValues(alpha: .14)
+                            : AppTheme.bg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${names[i]}: ${(work['offByDow'] as List<int>)[i]}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: active ? AppTheme.warning : AppTheme.muted,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 8),
+                if ((work['maxOff'] as int) > 0)
+                  Text(
+                    'Чаще всего выходной: ${['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'][work['maxI'] as int]} '
+                    '(${work['maxOff']} раз).'
+                    '${work['next'] != null ? ' Ближайший такой день: ${_dateRu(work['next'] as DateTime)}.' : ''}',
+                    style: const TextStyle(fontSize: 12),
+                  )
+                else
+                  Text(
+                    'Мало данных для прогноза выходного.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Как выйти в плюс',
+            subtitle: 'План по долгам к выбранной дате',
+            action: TextButton.icon(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _plusDate,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 3650)),
+                );
+                if (picked != null) setState(() => _plusDate = picked);
+              },
+              icon: const Icon(Icons.event, size: 16),
+              label: Text(_dateRu(_plusDate)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Цель: к ${_dateRu(_plusDate)} ($dLeft дн.)',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                if (c.calc.debtTotal <= 0)
+                  const Text(
+                    '✅ Долгов нет. Укрепите подушку и накопления.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.success),
+                  )
+                else ...[
+                  Text(
+                    'Нужно направлять на долги ≈ ${fmtMoney(needPerDay)} ₽/день, '
+                    'сейчас поток ≈ ${fmtMoney(netDay)} ₽/день.',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    gap > 0.004
+                        ? 'Не хватает ≈ ${fmtMoney(gap)} ₽/день до плана.'
+                        : 'Текущего потока хватает, если держать темп.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: gap > 0.004 ? AppTheme.warning : AppTheme.success,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Text(
+                  'Что сделать (обязательные не трогаем):',
+                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                ),
+                const SizedBox(height: 4),
+                if (ideas.isEmpty)
+                  Text(
+                    'Пока мало необязательных трат — заведите учёт «хотелок» отдельно.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                  )
+                else
+                  ...ideas.map(
+                    (x) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('• $x', style: const TextStyle(fontSize: 12)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Расходы по категориям',
+            subtitle: exp > 0
+                ? 'Всего ${fmtMoney(exp)} ₽ · $modeLabel'
+                : 'нет данных',
+            action: TextButton(
+              onPressed: () => setState(() => _expModeIncome = !_expModeIncome),
+              child: Text(
+                _expModeIncome ? 'доля от дохода' : 'доля от трат',
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+            child: expBy.isEmpty
+                ? const _NoData()
+                : Column(
+                    children: expBy.take(10).map((e) {
+                      final base = _expModeIncome ? inc : exp;
+                      final pct = base > 0 ? e.value / base : 0.0;
+                      return _barRow(e.key, e.value, pct, e.value / maxExp);
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Доходы по категориям',
+            subtitle: inc > 0 ? 'Всего ${fmtMoney(inc)} ₽' : 'нет данных',
+            child: incBy.isEmpty
+                ? const _NoData()
+                : Column(
+                    children: incBy.map((e) {
+                      final pct = inc > 0 ? e.value / inc : 0.0;
+                      return _barRow(
+                        e.key,
+                        e.value,
+                        pct,
+                        e.value / maxInc,
+                        green: true,
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'theme/app_theme.dart';
 import 'state/app_controller.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'widgets/ui.dart';
 
 class BalanceApp extends StatefulWidget {
   const BalanceApp({super.key});
@@ -51,6 +52,10 @@ class _BalanceAppState extends State<BalanceApp> {
           return MaterialApp(
             title: 'BitBalance',
             debugShowCheckedModeBanner: false,
+            builder: (context, child) => ScrollConfiguration(
+              behavior: AppScrollBehavior(),
+              child: child ?? const SizedBox.shrink(),
+            ),
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
@@ -62,6 +67,10 @@ class _BalanceAppState extends State<BalanceApp> {
         return MaterialApp(
           title: 'BitBalance',
           debugShowCheckedModeBanner: false,
+          builder: (context, child) => ScrollConfiguration(
+            behavior: AppScrollBehavior(),
+            child: child ?? const SizedBox.shrink(),
+          ),
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,

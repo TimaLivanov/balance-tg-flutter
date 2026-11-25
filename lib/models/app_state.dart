@@ -59,6 +59,7 @@ class Health {
 class Category {
   final String id;
   final String name;
+  final String icon;
   final bool need;
   final bool rare;
   final bool archived;
@@ -68,6 +69,7 @@ class Category {
   Category({
     required this.id,
     required this.name,
+    this.icon = '',
     this.need = false,
     this.rare = false,
     this.archived = false,
@@ -78,6 +80,7 @@ class Category {
   factory Category.fromJson(Map<dynamic, dynamic> j) => Category(
     id: str(j['id']),
     name: (j['name'] ?? 'Категория').toString(),
+    icon: (j['icon'] ?? '').toString(),
     need: j['need'] == true,
     rare: j['rare'] == true,
     archived: j['archived'] == true,
@@ -90,6 +93,7 @@ class Category {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'icon': icon,
     'need': need,
     'rare': rare,
     'archived': archived,
@@ -368,6 +372,7 @@ class AppState {
   int toastSec;
   bool toastSticky;
   int remindDays;
+  int recentOpsLimit;
   List<IncomeCategory> incomeCats;
   List<Category> cats;
   List<Debt> debts;
@@ -408,6 +413,7 @@ class AppState {
     this.toastSec = 6,
     this.toastSticky = false,
     this.remindDays = 2,
+    this.recentOpsLimit = 10,
     required this.incomeCats,
     required this.cats,
     required this.debts,
@@ -491,6 +497,10 @@ class AppState {
           : _int(json['toastSec'], fallback: 6),
       toastSticky: json['toastSticky'] == true,
       remindDays: _int(json['remindDays'], fallback: 2),
+      recentOpsLimit:
+          [5, 10, 30].contains(_int(json['recentOpsLimit'], fallback: 10))
+          ? _int(json['recentOpsLimit'], fallback: 10)
+          : 10,
       incomeCats: incomeCats,
       cats: _list(json['cats'])
           .map((e) => Category.fromJson(e as Map<dynamic, dynamic>))
@@ -562,6 +572,7 @@ class AppState {
     'toastSec': toastSec,
     'toastSticky': toastSticky,
     'remindDays': remindDays,
+    'recentOpsLimit': recentOpsLimit,
     'incomeCats': incomeCats.map((e) => e.toJson()).toList(),
     'cats': cats.map((e) => e.toJson()).toList(),
     'debts': debts.map((e) => e.toJson()).toList(),

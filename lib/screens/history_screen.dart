@@ -9,6 +9,13 @@ import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 
+class _OpLine {
+  final String label;
+  final String value;
+  final Color color;
+  const _OpLine(this.label, this.value, this.color);
+}
+
 class HistoryScreen extends StatefulWidget {
   final AppController controller;
   const HistoryScreen({super.key, required this.controller});
@@ -41,13 +48,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return '${d.day} ${months[d.month]} ${d.year}';
   }
 
-  String _describe(Entry e) {
-    final parts = <String>[];
-    if (e.income > 0) parts.add('Доход ${fmtMoney(e.income)} ₽');
-    if (e.expenses.isNotEmpty) {
-      final total = e.expenses.values.fold(0.0, (a, b) => a + b);
-      parts.add('Траты ${fmtMoney(total)} ₽');
+  /// Подробная расшифровка операции: доход, каждая категория расхода,
+  /// долг, копилка и подушка — как в HTML-версии.
+  List<_OpLine> _lines(Entry e) {
+    final lines = <_OpLine>[];
+    if (e.income > 0) {
+      lines.add(_OpLine('Доход', '+${fmtMoney(e.income)} ₽', AppTheme.success));
     }
+    e.expenses.forEach((id, v) {
+      if (v <= 0) return;
+      final name =
+          c.state.cats
+              .where((x) => x.id == id)
+              .map((x) => x.name)
+              .firstOrNull ??
+          'расход';
+      lines.add(_OpLine(name, '−${fmtMoney(v)} ₽', AppTheme.danger));
+    });
     e.debtPays.forEach((id, v) {
       if (v <= 0) return;
       final name =
@@ -56,14 +73,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
               .map((d) => d.name)
               .firstOrNull ??
           id;
-      parts.add('→ долг «$name» −${fmtMoney(v)} ₽');
+      lines.add(
+        _OpLine('→ долг «$name»', '−${fmtMoney(v)} ₽', AppTheme.danger),
+      );
     });
-    if (e.savings.isNotEmpty) {
-      final total = e.savings.values.fold(0.0, (a, b) => a + b);
-      parts.add('Накопления ${fmtMoney(total)} ₽');
+    e.savings.forEach((id, v) {
+      if (v <= 0) return;
+      final name =
+          c.state.savings
+              .where((g) => g.id == id)
+              .map((g) => g.name)
+              .firstOrNull ??
+          'накопление';
+      lines.add(
+        _OpLine('копилка → «$name»', '↔${fmtMoney(v)} ₽', AppTheme.primary),
+      );
+    });
+    e.savSpend.forEach((id, v) {
+      if (v <= 0) return;
+      lines.add(
+        _OpLine('из накоплений', '+${fmtMoney(v)} ₽', AppTheme.success),
+      );
+    });
+    if (e.cushIn > 0) {
+      lines.add(
+        _OpLine(
+          'копилка → подушка',
+          '↔${fmtMoney(e.cushIn)} ₽',
+          AppTheme.primary,
+        ),
+      );
     }
-    if (e.cushIn > 0) parts.add('В подушку ${fmtMoney(e.cushIn)} ₽');
-    if (e.cushOut > 0) parts.add('Из подушки ${fmtMoney(e.cushOut)} ₽');
+    if (e.cushOut > 0) {
+      lines.add(
+        _OpLine(
+          'подушка → копилка',
+          '↔${fmtMoney(e.cushOut)} ₽',
+          AppTheme.success,
+        ),
+      );
+    }
     if (e.type == 'debt') {
       final name =
           c.state.debts
@@ -71,13 +120,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
               .map((d) => d.name)
               .firstOrNull ??
           '';
-      parts.add(
-        'долг «$name» +${fmtMoney(e.debtAmt)} ₽ '
-        '${e.creditCash ? 'в копилку' : 'без зачисления в копилку'}',
+      lines.add(
+        _OpLine('долг «$name»', '+${fmtMoney(e.debtAmt)} ₽', AppTheme.danger),
+      );
+      lines.add(
+        _OpLine(
+          e.creditCash ? 'в копилку из долга' : 'без зачисления в копилку',
+          e.creditCash ? '+${fmtMoney(e.debtAmt)} ₽' : '—',
+          e.creditCash ? AppTheme.success : AppTheme.muted,
+        ),
       );
     }
-    if (parts.isEmpty) parts.add('Пустая запись');
-    return parts.join(' · ');
+    if (lines.isEmpty) lines.add(_OpLine('Пустая запись', '', AppTheme.muted));
+    return lines;
   }
 
   void _editNote(Entry e) {
@@ -133,6 +188,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
   }
+
+  String _describe(Entry e) =>
+      _lines(e).map((l) => '${l.label} ${l.value}'.trim()).join(' · ');
 
   void _delete(Entry e) {
     confirmDialog(
@@ -371,12 +429,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                _describe(e),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.text,
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _lines(e)
+                                    .map(
+                                      (line) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 2,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                line.label,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: line.color,
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              line.value,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: line.color,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
                               if (e.note.isNotEmpty) ...[
                                 const SizedBox(height: 6),

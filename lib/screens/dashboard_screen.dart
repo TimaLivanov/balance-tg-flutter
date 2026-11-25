@@ -212,457 +212,374 @@ class _DashboardScreenState extends State<DashboardScreen> {
         )
         .toList();
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          key: const PageStorageKey('dashboard-scroll'),
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppScrollView(
+      storageKey: 'dashboard-scroll',
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'BitBalance',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                        Text(
-                          'Финансовый пульт',
-                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Скрыть суммы',
-                    onPressed: () =>
-                        c.updateSetting((s) => s.hideBal = !s.hideBal),
-                    icon: Icon(
-                      c.state.hideBal ? Icons.visibility_off : Icons.visibility,
-                    ),
-                  ),
-                  if (c.guest)
-                    const Chip(
-                      label: Text('Гость', style: TextStyle(fontSize: 11)),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Hero
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Текущий баланс',
-                        style: TextStyle(fontSize: 13, color: AppTheme.muted),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BitBalance',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primary,
                       ),
-                      const SizedBox(height: 4),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
+                    ),
+                    Text(
+                      'Финансовый пульт',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Скрыть суммы',
+                onPressed: () => c.updateSetting((s) => s.hideBal = !s.hideBal),
+                icon: Icon(
+                  c.state.hideBal ? Icons.visibility_off : Icons.visibility,
+                ),
+              ),
+              if (c.guest)
+                const Chip(
+                  label: Text('Гость', style: TextStyle(fontSize: 11)),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Hero
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Текущий баланс',
+                    style: TextStyle(fontSize: 13, color: AppTheme.muted),
+                  ),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _shown(calc.balance),
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: calc.balance >= 0
+                            ? AppTheme.text
+                            : AppTheme.danger,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (change >= 0 ? AppTheme.success : AppTheme.danger)
+                                  .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Text(
-                          _shown(calc.balance),
+                          '${change >= 0 ? '+' : ''}${_shown(change)} · ${changePct.toStringAsFixed(1)}%',
                           style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: calc.balance >= 0
-                                ? AppTheme.text
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: change >= 0
+                                ? AppTheme.success
                                 : AppTheme.danger,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  (change >= 0
-                                          ? AppTheme.success
-                                          : AppTheme.danger)
-                                      .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${change >= 0 ? '+' : ''}${_shown(change)} · ${changePct.toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: change >= 0
-                                    ? AppTheme.success
-                                    : AppTheme.danger,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'за период',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _metric(
-                              'Копилка',
-                              _shown(calc.cash + calc.savingsTotal),
-                              'своб. ${_shown(calc.cash)}',
-                              AppTheme.primary,
-                            ),
-                          ),
-                          Expanded(
-                            child: _metric(
-                              'Долги',
-                              _shown(calc.debtTotal),
-                              'осталось вернуть',
-                              AppTheme.danger,
-                            ),
-                          ),
-                          Expanded(
-                            child: _metric(
-                              'Подушка',
-                              _shown(calc.cushion),
-                              'безопасность',
-                              AppTheme.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Divider(height: 1),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Text(
-                            'Подушка безопасности',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${calc.cushionPct.toStringAsFixed(0)}% · ${c.state.cushionMonths} мес.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ProgressLine(
-                        value: calc.cushionPct / 100,
-                        color: AppTheme.success,
-                      ),
-                      const SizedBox(height: 6),
+                      const SizedBox(width: 8),
                       Text(
-                        'Цель ${_shown(calc.cushionGoal)} · осталось ${_shown(calc.cushionRemaining)}',
+                        'за период',
+                        style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _metric(
+                          'Копилка',
+                          _shown(calc.cash + calc.savingsTotal),
+                          'своб. ${_shown(calc.cash)}',
+                          AppTheme.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: _metric(
+                          'Долги',
+                          _shown(calc.debtTotal),
+                          'осталось вернуть',
+                          AppTheme.danger,
+                        ),
+                      ),
+                      Expanded(
+                        child: _metric(
+                          'Подушка',
+                          _shown(calc.cushion),
+                          'безопасность',
+                          AppTheme.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text(
+                        'Подушка безопасности',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${calc.cushionPct.toStringAsFixed(0)}% · ${c.state.cushionMonths} мес.',
                         style: TextStyle(fontSize: 12, color: AppTheme.muted),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  ProgressLine(
+                    value: calc.cushionPct / 100,
+                    color: AppTheme.success,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Цель ${_shown(calc.cushionGoal)} · осталось ${_shown(calc.cushionRemaining)}',
+                    style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // График
+          SectionCard(
+            title: 'Динамика баланса',
+            subtitle: 'Свечи, линия и скользящие средние',
+            action: TextButton(
+              onPressed: () => setState(() => _ma = !_ma),
+              child: Text(
+                'MA',
+                style: TextStyle(
+                  color: _ma ? AppTheme.warning : AppTheme.muted,
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Остатки и рекомендации по долгам
-              SectionCard(
-                title: 'Долги · осталось вернуть',
-                subtitle: openDebts.isEmpty
-                    ? 'Активных долгов нет'
-                    : 'мин. всего ${fmtRec(debtMinSum(c.state, calc))} ₽ / день',
-                child: openDebts.isEmpty
-                    ? Text(
-                        'Долгов нет',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                      )
-                    : Column(
-                        children: orderedDebts(c.state, calc, openDebts).map((
-                          d,
-                        ) {
-                          final rec = debtRec(c.state, calc, d);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        d.name,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        'остаток ${_shown(rec.remain)}'
-                                        '${rec.daysLeft != null ? ' · ${rec.daysLeft} дн.' : ''}'
-                                        '${rec.overdue ? ' · срок прошёл' : ''}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (rec.perDay != null && rec.perDay! > 0)
-                                  Text(
-                                    'рек. ${fmtRec(rec.perDay!)} ₽/день',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
-
-              // График
-              SectionCard(
-                title: 'Динамика баланса',
-                subtitle: 'Свечи, линия и скользящие средние',
-                action: TextButton(
-                  onPressed: () => setState(() => _ma = !_ma),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final t in ['День', 'Нед', 'Мес', 'Год'])
+                      _pill(t, _tf == _tfKey(t), () => _setTf(_tfKey(t))),
+                    _pill('Свечи', _candle, () => _setMode(true)),
+                    _pill('Линия', !_candle, () => _setMode(false)),
+                  ],
+                ),
+                Padding(
+                  padding: EdgeInsets.only(top: 6),
                   child: Text(
-                    'MA',
-                    style: TextStyle(
-                      color: _ma ? AppTheme.warning : AppTheme.muted,
-                    ),
+                    'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
+                    style: TextStyle(fontSize: 10, color: AppTheme.muted),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        for (final t in ['День', 'Нед', 'Мес', 'Год'])
-                          _pill(t, _tf == _tfKey(t), () => _setTf(_tfKey(t))),
-                        _pill('Свечи', _candle, () => _setMode(true)),
-                        _pill('Линия', !_candle, () => _setMode(false)),
-                      ],
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(top: 6),
+                const SizedBox(height: 4),
+                const SizedBox(height: 10),
+                if (bars.isEmpty)
+                  SizedBox(
+                    height: 200,
+                    child: Center(
                       child: Text(
-                        'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
-                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                        'Проведите первый день — здесь появится график баланса',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppTheme.muted, fontSize: 13),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const SizedBox(height: 10),
-                    if (bars.isEmpty)
-                      SizedBox(
-                        height: 200,
-                        child: Center(
-                          child: Text(
-                            'Проведите первый день — здесь появится график баланса',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppTheme.muted,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      BalanceChart(bars: bars, candle: _candle, ma: _ma),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Быстрая запись
-              SectionCard(
-                title: 'Быстрая запись',
-                subtitle: 'Доход или расход одним касанием',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _pill(
-                          'Сегодня',
-                          _quickOffset == 0,
-                          () => setState(() => _quickOffset = 0),
-                        ),
-                        const SizedBox(width: 6),
-                        _pill(
-                          'Вчера',
-                          _quickOffset == -1,
-                          () => setState(() => _quickOffset = -1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _quickIncome,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Доход, ₽',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value:
-                                _quickIncomeCat ??
-                                (c.state.incomeCats.isNotEmpty
-                                    ? c.state.incomeCats.first.id
-                                    : null),
-                            decoration: const InputDecoration(
-                              labelText: 'Источник',
-                            ),
-                            items: c.state.incomeCats
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e.id,
-                                    child: Text(e.name),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) =>
-                                setState(() => _quickIncomeCat = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _quickExpense,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Расход, ₽',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _quickExpCat,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Куда',
-                            ),
-                            items: [
-                              const DropdownMenuItem(
-                                value: 'cush',
-                                child: Text('Подушка'),
-                              ),
-                              ...activeCats.map(
-                                (e) => DropdownMenuItem(
-                                  value: 'c:${e.id}',
-                                  child: Text(e.name),
-                                ),
-                              ),
-                              ...openDebts.map(
-                                (e) => DropdownMenuItem(
-                                  value: 'd:${e.id}',
-                                  child: Text('Долг: ${e.name}'),
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() => _quickExpCat = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _quickNote,
-                      decoration: const InputDecoration(
-                        labelText: 'Примечание',
-                        hintText: 'необязательно',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _quickDo('inc'),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Доход'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () => _quickDo('exp'),
-                            icon: const Icon(Icons.remove),
-                            label: const Text('Записать'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Полная запись дня
-              SectionCard(
-                title: 'Полная запись дня',
-                subtitle: 'Доход, траты, долги, накопления и подушка',
-                action: TextButton(
-                  onPressed: () =>
-                      setState(() => _formExpanded = !_formExpanded),
-                  child: Text(_formExpanded ? 'Свернуть' : 'Открыть'),
-                ),
-                child: _formExpanded
-                    ? _buildFullForm(activeCats, openDebts)
-                    : Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          'Заполните поля одним касанием — всё в одном месте.',
-                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                        ),
-                      ),
-              ),
-            ],
+                  )
+                else
+                  BalanceChart(bars: bars, candle: _candle, ma: _ma),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+
+          // Быстрая запись
+          SectionCard(
+            title: 'Быстрая запись',
+            subtitle: 'Доход или расход одним касанием',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _pill(
+                      'Сегодня',
+                      _quickOffset == 0,
+                      () => setState(() => _quickOffset = 0),
+                    ),
+                    const SizedBox(width: 6),
+                    _pill(
+                      'Вчера',
+                      _quickOffset == -1,
+                      () => setState(() => _quickOffset = -1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _quickIncome,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Доход, ₽',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value:
+                            _quickIncomeCat ??
+                            (c.state.incomeCats.isNotEmpty
+                                ? c.state.incomeCats.first.id
+                                : null),
+                        decoration: const InputDecoration(
+                          labelText: 'Источник',
+                        ),
+                        items: c.state.incomeCats
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.id,
+                                child: Text(e.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => _quickIncomeCat = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _quickExpense,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Расход, ₽',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _quickExpCat,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Куда'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'cush',
+                            child: Text('Подушка'),
+                          ),
+                          ...activeCats.map(
+                            (e) => DropdownMenuItem(
+                              value: 'c:${e.id}',
+                              child: Text(e.name),
+                            ),
+                          ),
+                          ...openDebts.map(
+                            (e) => DropdownMenuItem(
+                              value: 'd:${e.id}',
+                              child: Text('Долг: ${e.name}'),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _quickExpCat = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _quickNote,
+                  decoration: const InputDecoration(
+                    labelText: 'Примечание',
+                    hintText: 'необязательно',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _quickDo('inc'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Доход'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _quickDo('exp'),
+                        icon: const Icon(Icons.remove),
+                        label: const Text('Записать'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Полная запись дня
+          SectionCard(
+            title: 'Полная запись дня',
+            subtitle: 'Доход, траты, долги, накопления и подушка',
+            action: TextButton(
+              onPressed: () => setState(() => _formExpanded = !_formExpanded),
+              child: Text(_formExpanded ? 'Свернуть' : 'Открыть'),
+            ),
+            child: _formExpanded
+                ? _buildFullForm(activeCats, openDebts)
+                : Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Заполните поля одним касанием — всё в одном месте.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }

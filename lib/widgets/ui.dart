@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../theme/app_theme.dart';
 
@@ -47,6 +48,62 @@ String fmtCompact(double v) {
   if (a >= 1000)
     return '$sign${(a / 1000).toStringAsFixed(a >= 100000 ? 0 : 1)}k';
   return '$sign${a.toStringAsFixed(0)}';
+}
+
+/// На Web/Telegram не используем bounce и не отдаём жест браузеру:
+/// вертикальный swipe всегда скроллит содержимое приложения.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+  };
+}
+
+/// Единственный скролл экрана: без chain-scroll, без вложенного SafeArea
+/// снизу и без сброса позиции при появлении клавиатуры или смене данных.
+class AppScrollView extends StatelessWidget {
+  final String storageKey;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  const AppScrollView({
+    super.key,
+    required this.storageKey,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(16, 16, 16, 32),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppTheme.bg,
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        left: false,
+        right: false,
+        child: NotificationListener<OverscrollNotification>(
+          onNotification: (_) => true,
+          child: SingleChildScrollView(
+            key: PageStorageKey(storageKey),
+            physics: const ClampingScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: padding,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ScreenHeader extends StatelessWidget {
@@ -216,19 +273,28 @@ class StatTile extends StatelessWidget {
   }
 }
 
+/// Полоса прогресса: чем больше закрыто, тем зеленее (красный → жёлтый → зелёный).
 class ProgressLine extends StatelessWidget {
   final double value;
-  final Color color;
-  const ProgressLine({super.key, required this.value, required this.color});
+  final Color? color;
+  const ProgressLine({super.key, required this.value, this.color});
+
+  static Color debtColor(double value) {
+    final v = value.clamp(0.0, 1.0);
+    // HSL: 0° — красный, 120° — зелёный.
+    return HSLColor.fromAHSL(1, v * 120, 0.75, 0.46).toColor();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final v = value.clamp(0.0, 1.0);
+    final c = color ?? debtColor(v);
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: LinearProgressIndicator(
-        value: value.clamp(0, 1),
-        color: color,
-        backgroundColor: const Color(0xFFE5E7EB),
+        value: v,
+        color: c,
+        backgroundColor: c.withValues(alpha: 0.14),
         minHeight: 8,
       ),
     );

@@ -100,86 +100,80 @@ class _ReportScreenState extends State<ReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          key: const PageStorageKey('report-scroll'),
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AppScrollView(
+      storageKey: 'report-scroll',
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenHeader(
+            eyebrow: 'Отчёт',
+            title: 'Выгрузка для консультанта',
+            subtitle: 'Только факты: баланс, долги, доходы и траты',
+          ),
+          const SizedBox(height: 20),
+          SectionCard(
+            title: 'Отчёт для консультанта',
+            subtitle: 'Факты за период: баланс, копилка, подушка, долги, доходы и траты.',
+            action: DropdownButton<String>(
+              value: _period,
+              items: const [
+                DropdownMenuItem(value: '7', child: Text('7 дней')),
+                DropdownMenuItem(value: '30', child: Text('30 дней')),
+                DropdownMenuItem(value: '90', child: Text('90 дней')),
+                DropdownMenuItem(value: '365', child: Text('Год')),
+                DropdownMenuItem(value: 'all', child: Text('Всё время')),
+              ],
+              onChanged: (v) => setState(() => _period = v ?? '30'),
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: SelectableText(
+                _buildReport(),
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  height: 1.6,
+                  color: AppTheme.text,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
             children: [
-              ScreenHeader(
-                eyebrow: 'Отчёт',
-                title: 'Выгрузка для консультанта',
-                subtitle: 'Только факты: баланс, долги, доходы и траты',
-              ),
-              const SizedBox(height: 20),
-              SectionCard(
-                title: 'Отчёт для консультанта',
-                subtitle: 'Факты за период: баланс, копилка, подушка, долги, доходы и траты.',
-                action: DropdownButton<String>(
-                  value: _period,
-                  items: const [
-                    DropdownMenuItem(value: '7', child: Text('7 дней')),
-                    DropdownMenuItem(value: '30', child: Text('30 дней')),
-                    DropdownMenuItem(value: '90', child: Text('90 дней')),
-                    DropdownMenuItem(value: '365', child: Text('Год')),
-                    DropdownMenuItem(value: 'all', child: Text('Всё время')),
-                  ],
-                  onChanged: (v) => setState(() => _period = v ?? '30'),
-                ),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.bg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: SelectableText(
-                    _buildReport(),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      height: 1.6,
-                      color: AppTheme.text,
-                    ),
-                  ),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _download,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Скачать отчёт (HTML)'),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _download,
-                      icon: const Icon(Icons.download),
-                      label: const Text('Скачать отчёт (HTML)'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Копировать',
-                    icon: const Icon(Icons.copy),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _buildReport()));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Отчёт скопирован')),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Период: ${_periodLabel()}',
-                style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Копировать',
+                icon: const Icon(Icons.copy),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _buildReport()));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Отчёт скопирован')),
+                  );
+                },
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            'Период: ${_periodLabel()}',
+            style: TextStyle(fontSize: 12, color: AppTheme.muted),
+          ),
+        ],
       ),
     );
   }

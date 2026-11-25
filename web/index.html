@@ -42,8 +42,8 @@
       overscroll-behavior-y: none;
       background: #f6f8fb;
     }
-    body { touch-action: pan-y; }
-    flt-glass-pane { overscroll-behavior: none; }
+    body { touch-action: pan-y; overscroll-behavior-y: contain; }
+    flt-glass-pane { overscroll-behavior: none; touch-action: pan-y; }
     @media (prefers-color-scheme: dark) { html, body { background: #0f172a; } }
   </style>
 
@@ -53,7 +53,13 @@
     (function () {
       var tg = window.Telegram && window.Telegram.WebApp;
       if (tg) {
-        try { tg.ready(); tg.expand(); } catch (e) {}
+        try {
+          tg.ready();
+          tg.expand();
+          // Иначе Telegram тянет весь Mini App вниз вместо скролла其内容.
+          if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+          if (typeof tg.setAllowClosing === 'function') tg.setAllowClosing(false);
+        } catch (e) {}
         if (tg.themeParams && tg.themeParams.bg_color) {
           document.body.style.background = tg.themeParams.bg_color;
         }

@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
@@ -17,6 +19,9 @@ class Bar {
   final double close;
   final bool empty;
   final int volume;
+  final List<String> ops;
+  final double income;
+  final double expense;
 
   Bar({
     required this.date,
@@ -27,6 +32,9 @@ class Bar {
     required this.close,
     this.empty = false,
     this.volume = 0,
+    this.ops = const [],
+    this.income = 0,
+    this.expense = 0,
   });
 }
 
@@ -84,7 +92,20 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
       if (p.low < low) low = p.low;
     }
     final close = list.last.close;
-    daily.add(_bar(key, open, high, low, close, false, list.length));
+    daily.add(
+      _bar(
+        key,
+        open,
+        high,
+        low,
+        close,
+        false,
+        list.length,
+        ops: list.expand((p) => p.ops).toList(),
+        income: list.fold(0.0, (a, p) => a + p.income),
+        expense: list.fold(0.0, (a, p) => a + p.expense),
+      ),
+    );
     prevClose = close;
   }
 
@@ -105,6 +126,9 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
         low: b.low,
         close: b.close,
         volume: b.volume,
+        ops: b.ops,
+        income: b.income,
+        expense: b.expense,
       );
       order.add(k);
     } else {
@@ -116,6 +140,9 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
         low: math.min(w.low, b.low),
         close: b.close,
         volume: w.volume + b.volume,
+        ops: [...w.ops, ...b.ops],
+        income: w.income + b.income,
+        expense: w.expense + b.expense,
       );
     }
   }
@@ -129,8 +156,11 @@ Bar _bar(
   double l,
   double c,
   bool empty,
-  int volume,
-) {
+  int volume, {
+  List<String> ops = const [],
+  double income = 0,
+  double expense = 0,
+}) {
   return Bar(
     date: date,
     label: date.substring(5, 7) == '01' || date.substring(8, 10) == '01'
@@ -142,6 +172,9 @@ Bar _bar(
     close: c,
     empty: empty,
     volume: volume,
+    ops: ops,
+    income: income,
+    expense: expense,
   );
 }
 
@@ -160,6 +193,9 @@ class BalanceChart extends StatefulWidget {
   final double zoom;
   final double height;
 
+  /// Показывать сводку по свече при наведении/касании (как в HTML).
+  final bool showSummary;
+
   const BalanceChart({
     super.key,
     required this.bars,
@@ -167,6 +203,7 @@ class BalanceChart extends StatefulWidget {
     this.ma = false,
     this.zoom = 1,
     this.height = 240,
+    this.showSummary = true,
   });
 
   @override
@@ -185,6 +222,10 @@ class _BalanceChartState extends State<BalanceChart> {
   double _startOffset = 0;
   double _startCell = 1;
 
+  /// 0 — направление жеста ещё не ясно, 1 — горизонтальный, 2 — вертикальный.
+  /// Вертикальный жест отдаём родительскому скроллу.
+  int _panAxis = 0;
+
   double? _pinchDistance;
   double? _pinchStartCount;
   double? _pinchStartOffset;
@@ -199,6 +240,7 @@ class _BalanceChartState extends State<BalanceChart> {
   @override
   void dispose() {
     _cursor.dispose();
+    _pinnedCandle.dispose();
     super.dispose();
   }
 
@@ -214,6 +256,25 @@ class _BalanceChartState extends State<BalanceChart> {
     return plotW > 0 ? plotW / _visibleCount : 1;
   }
 
+  int? _indexAt(Offset pos) {
+    final width = (context.findRenderObject() as RenderBox?)?.size.width ?? 320;
+    final plotW = width - _BalanceChartPainter.padL - _BalanceChartPainter.padR;
+    final x = pos.dx - _BalanceChartPainter.padL;
+    if (plotW <= 0 || x < 0 || x > plotW) return null;
+    final (start, end) = _window();
+    final i = start + (x / plotW * (end - start)).floor();
+    return i.clamp(0, widget.bars.length - 1);
+  }
+
+  /// Зафиксированная свеча для подробной сводки (как popup в HTML).
+  final ValueNotifier<int?> _pinnedCandle = ValueNotifier(null);
+
+  void _setCandle(Offset pos) {
+    if (!widget.showSummary) return;
+    final i = _indexAt(pos);
+    if (i != null && i != _pinnedCandle.value) _pinnedCandle.value = i;
+  }
+
   (int, int) _window() {
     final end = widget.bars.length - _rightOffset.round().clamp(0, _maxOffset);
     final start = math.max(0, end - _visibleCount);
@@ -221,6 +282,7 @@ class _BalanceChartState extends State<BalanceChart> {
   }
 
   void _reset() {
+    _pinnedCandle.value = null;
     setState(() {
       _barCount = (60 / widget.zoom).round().clamp(8, 120);
       _rightOffset = 0;
@@ -239,11 +301,14 @@ class _BalanceChartState extends State<BalanceChart> {
           if (_pointers.isEmpty) _cursor.value = null;
         },
         child: Listener(
-          behavior: HitTestBehavior.opaque,
+          behavior: HitTestBehavior.translucent,
           onPointerDown: (e) {
+            // Клик мышью фиксирует свечу; прикосновение — только при тапе.
+            if (e.kind == PointerDeviceKind.mouse) _setCandle(e.localPosition);
             _pointers[e.pointer] = e.localPosition;
             _cursor.value = e.localPosition;
             if (_pointers.length == 1) {
+              _panAxis = 0;
               _panStart = e.localPosition;
               _startOffset = _rightOffset;
               _startCell = _cellFor(
@@ -258,7 +323,12 @@ class _BalanceChartState extends State<BalanceChart> {
             }
           },
           onPointerMove: (e) {
-            if (!_pointers.containsKey(e.pointer)) return;
+            if (!_pointers.containsKey(e.pointer)) {
+              // Наведение мыши тоже показывает сводку по свече.
+              if (e.kind == PointerDeviceKind.mouse)
+                _setCandle(e.localPosition);
+              return;
+            }
             _pointers[e.pointer] = e.localPosition;
             _cursor.value = e.localPosition;
             final width =
@@ -281,20 +351,33 @@ class _BalanceChartState extends State<BalanceChart> {
                         .toDouble();
               });
             } else if (_pointers.length == 1 && _panStart != null) {
-              setState(() {
-                _rightOffset =
-                    (_startOffset +
-                            (e.localPosition.dx - _panStart!.dx) / _startCell)
-                        .clamp(0, _maxOffset)
-                        .toDouble();
-              });
+              final dx = e.localPosition.dx - _panStart!.dx;
+              final dy = e.localPosition.dy - _panStart!.dy;
+              if (_panAxis == 0 && (dx.abs() > 6 || dy.abs() > 6)) {
+                _panAxis = dx.abs() > dy.abs() ? 1 : 2;
+              }
+              // Вертикальный жест не трогаем: пусть скроллится страница.
+              if (_panAxis == 1) {
+                setState(() {
+                  _rightOffset = (_startOffset + dx / _startCell)
+                      .clamp(0, _maxOffset)
+                      .toDouble();
+                });
+              }
             }
           },
           onPointerUp: (e) => _endPointer(e.pointer),
           onPointerCancel: (e) => _endPointer(e.pointer),
-          onPointerHover: (e) => _cursor.value = e.localPosition,
+          onPointerHover: (e) {
+            _cursor.value = e.localPosition;
+            _setCandle(e.localPosition);
+          },
           onPointerSignal: (e) {
-            if (e is PointerScrollEvent) {
+            // Обыное колесо/скролл должно листать экран, а не масштабировать график.
+            final zoomModifier =
+                HardwareKeyboard.instance.isControlPressed ||
+                HardwareKeyboard.instance.isMetaPressed;
+            if (e is PointerScrollEvent && zoomModifier) {
               setState(() {
                 _barCount = (_barCount + (e.scrollDelta.dy > 0 ? 2 : -2)).clamp(
                   8,
@@ -306,24 +389,45 @@ class _BalanceChartState extends State<BalanceChart> {
           },
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
+            onTapUp: (d) {
+              if (d.kind != PointerDeviceKind.mouse)
+                _setCandle(d.localPosition);
+            },
             onDoubleTap: _reset,
-            child: ValueListenableBuilder<Offset?>(
-              valueListenable: _cursor,
-              builder: (context, cursor, _) {
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    return CustomPaint(
-                      size: Size(constraints.maxWidth, widget.height),
-                      painter: _BalanceChartPainter(
-                        bars: show,
-                        candle: widget.candle,
-                        ma: widget.ma,
-                        cursor: cursor,
+            child: ValueListenableBuilder<int?>(
+              valueListenable: _pinnedCandle,
+              builder: (context, pinned, _) => ValueListenableBuilder<Offset?>(
+                valueListenable: _cursor,
+                builder: (context, cursor, _) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        height: widget.height,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return CustomPaint(
+                              size: Size(constraints.maxWidth, widget.height),
+                              painter: _BalanceChartPainter(
+                                bars: show,
+                                candle: widget.candle,
+                                ma: widget.ma,
+                                cursor: cursor,
+                                pinnedCandle: pinned,
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    );
-                  },
-                );
-              },
+                      if (widget.showSummary &&
+                          pinned != null &&
+                          pinned >= 0 &&
+                          pinned < show.length)
+                        _CandleSummary(bar: show[pinned]),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -341,7 +445,9 @@ class _BalanceChartState extends State<BalanceChart> {
     }
     if (_pointers.isEmpty) {
       _panStart = null;
-      _cursor.value = null;
+      _panAxis = 0;
+      // Курсор мыши остаётся, чтобы сводка не мигала при уходе пальца.
+      if (!kIsWeb) _cursor.value = null;
     } else {
       _panStart = _pointers.values.first;
       _startOffset = _rightOffset;
@@ -354,12 +460,14 @@ class _BalanceChartPainter extends CustomPainter {
   final bool candle;
   final bool ma;
   final Offset? cursor;
+  final int? pinnedCandle;
 
   _BalanceChartPainter({
     required this.bars,
     required this.candle,
     required this.ma,
     required this.cursor,
+    this.pinnedCandle,
   });
 
   static const padL = 6.0;
@@ -405,7 +513,10 @@ class _BalanceChartPainter extends CustomPainter {
 
     final idx = _cursorIndex();
     if (idx != null) _drawCrosshair(canvas, size, idx);
-    _drawLegend(canvas, idx ?? bars.length - 1);
+    final legendIdx = pinnedCandle ?? idx;
+    if (legendIdx != null && legendIdx >= 0 && legendIdx < bars.length) {
+      _drawCandleMarker(canvas, legendIdx);
+    }
   }
 
   void _calcRange() {
@@ -652,28 +763,25 @@ class _BalanceChartPainter extends CustomPainter {
     );
   }
 
-  void _drawLegend(Canvas canvas, int idx) {
+  void _drawCandleMarker(Canvas canvas, int idx) {
     final b = bars[idx];
-    final change = b.close - b.open;
-    final pct = b.open != 0 ? change / b.open.abs() * 100 : 0.0;
-    final color = change >= 0
-        ? const Color(0xFF0ECB81)
-        : const Color(0xFFF6465D);
-    final text =
-        'O ${fmtCompact(b.open)}  H ${fmtCompact(b.high)}  L ${fmtCompact(b.low)}  C ${fmtCompact(b.close)}  '
-        '${change >= 0 ? '+' : ''}${fmtCompact(change)} (${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%)';
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          fontSize: 10,
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+    final x = padL + (idx + 0.5) * cell;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(x - 18, padT + plotH + 3, 36, 16),
+        const Radius.circular(3),
       ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: plotW - 8);
-    tp.paint(canvas, Offset(padL + 4, 6));
+      Paint()..color = AppTheme.primary,
+    );
+    _text(
+      canvas,
+      b.label,
+      Offset(x - 18, padT + plotH + 5),
+      color: Colors.white,
+      size: 9,
+      align: TextAlign.center,
+      width: 36,
+    );
   }
 
   void _dashedLine(Canvas canvas, Offset a, Offset b, Paint paint) {
@@ -725,7 +833,126 @@ class _BalanceChartPainter extends CustomPainter {
       old.bars != bars ||
       old.candle != candle ||
       old.ma != ma ||
-      old.cursor != cursor;
+      old.cursor != cursor ||
+      old.pinnedCandle != pinnedCandle;
+}
+
+/// Подробная сводка по свече: O/H/L/C, изменение, доход/расход и операции дня.
+class _CandleSummary extends StatelessWidget {
+  final Bar bar;
+  const _CandleSummary({required this.bar});
+
+  @override
+  Widget build(BuildContext context) {
+    final change = bar.close - bar.open;
+    final pct = bar.open != 0 ? change / bar.open.abs() * 100 : 0.0;
+    final color = change >= 0 ? AppTheme.success : AppTheme.danger;
+    String val(double v) => fmtMoney(v);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Свеча ${bar.label}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '${change >= 0 ? '+' : '−'}${val(change.abs())} ₽ '
+                '(${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _cell('Открыто', val(bar.open)),
+              _cell('Закрыто', val(bar.close)),
+              _cell('Максимум', val(bar.high)),
+              _cell('Минимум', val(bar.low)),
+            ],
+          ),
+          if (bar.income > 0 || bar.expense > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Доход ${val(bar.income)} ₽ · влияние −${val(bar.expense)} ₽ · диапазон ${val(bar.high - bar.low)} ₽',
+              style: TextStyle(fontSize: 10, color: AppTheme.muted),
+            ),
+          ],
+          if (bar.ops.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: bar.ops.length,
+                itemBuilder: (context, i) {
+                  final op = bar.ops[i];
+                  final parts = op.split(': ');
+                  final positive = op.contains('+');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            parts.first,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        ),
+                        Text(
+                          parts.length > 1 ? parts.sublist(1).join(': ') : '',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: positive
+                                ? AppTheme.success
+                                : AppTheme.danger,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(String label, String value) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 9, color: AppTheme.muted)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ],
+    ),
+  );
 }
 
 double _niceStep(double raw) {

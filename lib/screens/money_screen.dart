@@ -33,431 +33,456 @@ class _MoneyScreenState extends State<MoneyScreen> {
     final archivedDebts = c.state.debts.where((x) => x.archived).toList();
     final archivedSavings = c.state.savings.where((x) => x.archived).toList();
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          key: const PageStorageKey('money-scroll'),
-          physics: const ClampingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ScreenHeader(
-                eyebrow: 'Деньги',
-                title: 'Категории и обязательства',
-                subtitle: 'Расходы, долги, накопления и подушка',
-                trailing: IconButton(
-                  onPressed: () => c.commit(),
-                  icon: const Icon(Icons.refresh),
-                ),
-              ),
-              const SizedBox(height: 20),
+    return AppScrollView(
+      storageKey: 'money-scroll',
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenHeader(
+            eyebrow: 'Деньги',
+            title: 'Категории и обязательства',
+            subtitle: 'Расходы, долги, накопления и подушка',
+            trailing: IconButton(
+              onPressed: () => c.commit(),
+              icon: const Icon(Icons.refresh),
+            ),
+          ),
+          const SizedBox(height: 20),
 
-              SectionCard(
-                title: 'Категории расходов',
-                subtitle: '${cats.length} активных',
-                action: TextButton.icon(
-                  onPressed: () => _addCategoryDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Новая'),
-                ),
-                child: cats.isEmpty
-                    ? const _Empty('Пока нет категорий')
-                    : Column(
-                        children: cats.map((cat) {
-                          final plan = cat.plan;
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: CircleAvatar(
-                              backgroundColor: cat.need
-                                  ? AppTheme.primary.withValues(alpha: .12)
-                                  : AppTheme.bg,
-                              child: Icon(
-                                cat.need
-                                    ? Icons.priority_high
-                                    : Icons.category_outlined,
-                                color: cat.need
-                                    ? AppTheme.primary
-                                    : AppTheme.muted,
-                                size: 18,
-                              ),
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(child: Text(cat.name)),
-                                if (cat.need) _Tag('обяз.', AppTheme.primary),
-                                if (cat.rare)
-                                  const _Tag('редк.', AppTheme.warning),
-                              ],
-                            ),
-                            subtitle: Text(
-                              plan != null
-                                  ? 'План ${fmtMoney(plan.amount)} ₽ · ${plan.date}'
-                                  : 'Без плана',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (v) => _catAction(v, cat.id),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Редактировать'),
+          SectionCard(
+            title: 'Категории расходов',
+            subtitle: '${cats.length} активных',
+            action: TextButton.icon(
+              onPressed: () => _addCategoryDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Новая'),
+            ),
+            child: cats.isEmpty
+                ? const _Empty('Пока нет категорий')
+                : Column(
+                    children: cats.map((cat) {
+                      final plan = cat.plan;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: cat.need
+                              ? AppTheme.primary.withValues(alpha: .12)
+                              : AppTheme.bg,
+                          child: cat.icon.isNotEmpty
+                              ? Text(
+                                  cat.icon,
+                                  style: const TextStyle(fontSize: 18),
+                                )
+                              : Icon(
+                                  cat.need
+                                      ? Icons.priority_high
+                                      : Icons.category_outlined,
+                                  color: cat.need
+                                      ? AppTheme.primary
+                                      : AppTheme.muted,
+                                  size: 18,
                                 ),
-                                PopupMenuItem(
-                                  value: 'del',
-                                  child: Text('Удалить'),
-                                ),
-                              ],
+                        ),
+                        onTap: () => _catOps(cat),
+                        title: Row(
+                          children: [
+                            Expanded(child: Text(cat.name)),
+                            if (cat.need) _Tag('обяз.', AppTheme.primary),
+                            if (cat.rare) const _Tag('редк.', AppTheme.warning),
+                          ],
+                        ),
+                        subtitle: Text(
+                          plan != null
+                              ? 'План ${fmtMoney(plan.amount)} ₽ · ${plan.date}'
+                              : 'Без плана',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (v) => _catAction(v, cat.id),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Редактировать'),
                             ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
+                            PopupMenuItem(value: 'del', child: Text('Удалить')),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 16),
 
-              SectionCard(
-                title: 'Долги',
-                subtitle:
-                    '${debts.length} шт. · осталось вернуть ${_shown(calc.debtTotal)} ₽ · '
-                    'мин. ${c.state.hideBal ? '••••' : fmtRec(minSum)} ₽ / день',
-                action: TextButton.icon(
-                  onPressed: () => _addDebtDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Новый'),
-                ),
-                child: debts.isEmpty
-                    ? const _Empty('Долгов нет')
-                    : Column(
-                        children: debts.map((d) {
-                          final rec = debtRec(c.state, calc, d);
-                          final closed = d.amount > 0
-                              ? ((d.amount - rec.remain) / d.amount * 100)
-                                    .round()
-                              : 0;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+          SectionCard(
+            title: 'Долги',
+            subtitle:
+                '${debts.length} шт. · осталось вернуть ${_shown(calc.debtTotal)} ₽ · '
+                'мин. ${c.state.hideBal ? '••••' : fmtRec(minSum)} ₽ / день',
+            action: TextButton.icon(
+              onPressed: () => _addDebtDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Новый'),
+            ),
+            child: debts.isEmpty
+                ? const _Empty('Долгов нет')
+                : Column(
+                    children: debts.map((d) {
+                      final rec = debtRec(c.state, calc, d);
+                      final closed = d.amount > 0
+                          ? ((d.amount - rec.remain) / d.amount * 100).round()
+                          : 0;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor: AppTheme.danger
-                                          .withValues(alpha: .1),
-                                      child: const Icon(
-                                        Icons.credit_card,
-                                        color: AppTheme.danger,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                CircleAvatar(
+                                  backgroundColor: AppTheme.danger.withValues(
+                                    alpha: .1,
+                                  ),
+                                  child: const Icon(
+                                    Icons.credit_card,
+                                    color: AppTheme.danger,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  d.name,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
+                                          Expanded(
+                                            child: Text(
+                                              d.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
                                               ),
-                                              if (rec.overdue)
-                                                const _Tag(
-                                                  'срок прошёл',
-                                                  AppTheme.danger,
-                                                ),
-                                            ],
-                                          ),
-                                          Text(
-                                            'остаток ${_shown(rec.remain)} ₽ из ${_shown(d.amount)} ₽'
-                                            '${d.due.isNotEmpty ? ' · до ${fmtDateRu(d.due)}' : ' · без срока'}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.muted,
                                             ),
                                           ),
-                                          if (rec.perDay != null &&
-                                              rec.perDay! > 0)
-                                            Text(
-                                              'рек. ${c.state.hideBal ? '••••' : fmtRec(rec.perDay!)} ₽ / день'
-                                              '${rec.daysLeft != null ? ' · ${rec.daysLeft} дн.' : ''}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppTheme.primary,
-                                              ),
+                                          if (rec.overdue)
+                                            const _Tag(
+                                              'срок прошёл',
+                                              AppTheme.danger,
                                             ),
                                         ],
                                       ),
+                                      Text(
+                                        'остаток ${_shown(rec.remain)} ₽ из ${_shown(d.amount)} ₽'
+                                        '${d.due.isNotEmpty ? ' · до ${fmtDateRu(d.due)}' : ' · без срока'}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.muted,
+                                        ),
+                                      ),
+                                      if (rec.perDay != null && rec.perDay! > 0)
+                                        Text(
+                                          'рек. ${c.state.hideBal ? '••••' : fmtRec(rec.perDay!)} ₽ / день'
+                                          '${rec.daysLeft != null ? ' · ${rec.daysLeft} дн.' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.primary,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuButton<String>(
+                                  onSelected: (v) => _debtAction(v, d.id),
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'ops',
+                                      child: Text('Операции'),
                                     ),
-                                    PopupMenuButton<String>(
-                                      onSelected: (v) => _debtAction(v, d.id),
-                                      itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                          value: 'ops',
-                                          child: Text('Операции'),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'edit',
-                                          child: Text('Редактировать'),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'archive',
-                                          child: Text('В архив'),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'del',
-                                          child: Text('Удалить'),
-                                        ),
-                                      ],
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Редактировать'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'archive',
+                                      child: Text('В архив'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'del',
+                                      child: Text('Удалить'),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
-                                ProgressLine(
-                                  value: closed / 100,
-                                  color: AppTheme.success,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'закрыто $closed%',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppTheme.muted,
-                                  ),
-                                ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Накопления и инвестиции',
-                subtitle: '${savings.length} целей',
-                action: TextButton.icon(
-                  onPressed: () => _addSavingsDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Новая'),
-                ),
-                child: savings.isEmpty
-                    ? const _Empty('Целей пока нет')
-                    : Column(
-                        children: savings.map((g) {
-                          final target = g.plan?.amount ?? 0;
-                          final progress = target > 0
-                              ? (g.closedFunded / target).clamp(0, 1)
-                              : 0.0;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.success.withValues(
-                                    alpha: .1,
-                                  ),
-                                  child: Icon(
-                                    g.kind == 'invest'
-                                        ? Icons.trending_up
-                                        : Icons.savings,
-                                    color: AppTheme.success,
-                                    size: 18,
-                                  ),
-                                ),
-                                title: Text(g.name),
-                                subtitle: Text(
-                                  'Цель ${fmtMoney(target)} ₽${g.plan?.date != null && g.plan!.date.isNotEmpty ? ' · до ${g.plan!.date}' : ''}',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
-                                  onPressed: () async {
-                                    final ok = await confirmDialog(
-                                      context,
-                                      title: 'Удалить цель?',
-                                      message:
-                                          'Цель «${g.name}» будет удалена.',
-                                    );
-                                    if (ok == true) c.deleteSavings(g.id);
-                                  },
-                                ),
+                            const SizedBox(height: 6),
+                            ProgressLine(value: closed / 100),
+                            const SizedBox(height: 2),
+                            Text(
+                              'закрыто $closed%',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.muted,
                               ),
-                              if (target > 0)
-                                ProgressLine(
-                                  value: progress.toDouble(),
-                                  color: AppTheme.success,
-                                ),
-                              const SizedBox(height: 8),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 16),
 
-              SectionCard(
-                title: 'Подушка',
-                subtitle: '${c.state.cushionMonths} месяцев запаса',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          SectionCard(
+            title: 'Накопления и инвестиции',
+            subtitle: '${savings.length} целей',
+            action: TextButton.icon(
+              onPressed: () => _addSavingsDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Новая'),
+            ),
+            child: savings.isEmpty
+                ? const _Empty('Целей пока нет')
+                : Column(
+                    children: savings.map((g) {
+                      final target = g.plan?.amount ?? 0;
+                      final progress = target > 0
+                          ? (g.closedFunded / target).clamp(0, 1)
+                          : 0.0;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.success.withValues(
+                                alpha: .1,
+                              ),
+                              child: Icon(
+                                g.kind == 'invest'
+                                    ? Icons.trending_up
+                                    : Icons.savings,
+                                color: AppTheme.success,
+                                size: 18,
+                              ),
+                            ),
+                            title: Text(g.name),
+                            subtitle: Text(
+                              'Цель ${fmtMoney(target)} ₽${g.plan?.date != null && g.plan!.date.isNotEmpty ? ' · до ${g.plan!.date}' : ''}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              onPressed: () async {
+                                final ok = await confirmDialog(
+                                  context,
+                                  title: 'Удалить цель?',
+                                  message: 'Цель «${g.name}» будет удалена.',
+                                );
+                                if (ok == true) c.deleteSavings(g.id);
+                              },
+                            ),
+                          ),
+                          if (target > 0)
+                            ProgressLine(
+                              value: progress.toDouble(),
+                              color: AppTheme.success,
+                            ),
+                          const SizedBox(height: 8),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Подушка',
+            subtitle: '${c.state.cushionMonths} месяцев запаса',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Сейчас', style: TextStyle(fontSize: 13)),
-                        Text(
-                          '${fmtMoney(calc.cushion)} ₽',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Цель', style: TextStyle(fontSize: 13)),
-                        Text(
-                          '${fmtMoney(calc.cushionGoal)} ₽',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ProgressLine(
-                      value: calc.cushionPct / 100,
-                      color: AppTheme.success,
-                    ),
-                    const SizedBox(height: 8),
+                    const Text('Сейчас', style: TextStyle(fontSize: 13)),
                     Text(
-                      calc.cushionRemaining > 0
-                          ? 'До цели ${fmtMoney(calc.cushionRemaining)} ₽ · рек. ${fmtMoney(calc.cushionRecPerDay)} ₽/день'
-                          : 'Цель набрана',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                      '${fmtMoney(calc.cushion)} ₽',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Доходные категории',
-                action: TextButton.icon(
-                  onPressed: () => _addIncomeCatDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Добавить'),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Цель', style: TextStyle(fontSize: 13)),
+                    Text(
+                      '${fmtMoney(calc.cushionGoal)} ₽',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
                 ),
-                child: Wrap(
-                  spacing: 8,
-                  children: c.state.incomeCats
-                      .map(
-                        (e) => Chip(
-                          label: Text(e.name),
-                          onDeleted: e.id == '1'
-                              ? null
-                              : () {
-                                  c.updateSetting(
-                                    (s) => s.incomeCats.removeWhere(
-                                      (x) => x.id == e.id,
-                                    ),
-                                  );
-                                },
-                        ),
-                      )
-                      .toList(),
+                const SizedBox(height: 10),
+                ProgressLine(
+                  value: calc.cushionPct / 100,
+                  color: AppTheme.success,
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              SectionCard(
-                title: 'Автоплатежи',
-                subtitle: '${c.state.autopay.length} правил',
-                action: TextButton.icon(
-                  onPressed: () => _addAutoPayDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Новый'),
-                ),
-                child: c.state.autopay.isEmpty
-                    ? const _Empty('Автоплатежей нет')
-                    : Column(
-                        children: c.state.autopay
-                            .map(
-                              (a) => ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(a.name),
-                                subtitle: Text(
-                                  '${fmtMoney(a.amount)} ₽ · ${a.mode == 'monthly' ? 'каждое ${a.day}-е число' : 'каждый день'} · ${a.time}',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
-                                  onPressed: () => c.deleteAutoPay(a.id),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-              ),
-              if (archivedCats.isNotEmpty ||
-                  archivedDebts.isNotEmpty ||
-                  archivedSavings.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                SectionCard(
-                  title: 'Архив',
-                  subtitle: 'Закрытые цели и погашенные долги',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ...archivedDebts.map(
-                        (d) => ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Долг: ${d.name}'),
-                          subtitle: Text(
-                            'остаток был ${fmtMoney(calc.debtRemain[d.id] ?? 0)} ₽ · '
-                            '${(calc.debtRemain[d.id] ?? 0) <= 0.004 ? 'долг погашен' : 'долг в архиве'}'
-                            '${d.archivedAt.isNotEmpty ? ' · ${fmtDateRu(d.archivedAt)}' : ''}',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          trailing: TextButton(
-                            onPressed: () =>
-                                c.updateDebt(d.id, archived: false),
-                            child: const Text('Вернуть'),
-                          ),
-                        ),
-                      ),
-                      ...archivedCats.map(
-                        (x) => Text(
-                          'Категория: ${x.name}',
-                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                        ),
-                      ),
-                      ...archivedSavings.map(
-                        (x) => Text(
-                          'Цель: ${x.name}',
-                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  calc.cushionRemaining > 0
+                      ? 'До цели ${fmtMoney(calc.cushionRemaining)} ₽ · рек. ${fmtMoney(calc.cushionRecPerDay)} ₽/день'
+                      : 'Цель набрана',
+                  style: TextStyle(fontSize: 12, color: AppTheme.muted),
                 ),
               ],
-            ],
+            ),
           ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Доходные категории',
+            action: TextButton.icon(
+              onPressed: () => _addIncomeCatDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить'),
+            ),
+            child: Wrap(
+              spacing: 8,
+              children: c.state.incomeCats
+                  .map(
+                    (e) => Chip(
+                      label: Text(e.name),
+                      onDeleted: e.id == '1'
+                          ? null
+                          : () {
+                              c.updateSetting(
+                                (s) => s.incomeCats.removeWhere(
+                                  (x) => x.id == e.id,
+                                ),
+                              );
+                            },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
+            title: 'Автоплатежи',
+            subtitle: '${c.state.autopay.length} правил',
+            action: TextButton.icon(
+              onPressed: () => _addAutoPayDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Новый'),
+            ),
+            child: c.state.autopay.isEmpty
+                ? const _Empty('Автоплатежей нет')
+                : Column(
+                    children: c.state.autopay
+                        .map(
+                          (a) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(a.name),
+                            subtitle: Text(
+                              '${fmtMoney(a.amount)} ₽ · ${a.mode == 'monthly' ? 'каждое ${a.day}-е число' : 'каждый день'} · ${a.time}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              onPressed: () => c.deleteAutoPay(a.id),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+          ),
+          if (archivedCats.isNotEmpty ||
+              archivedDebts.isNotEmpty ||
+              archivedSavings.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Архив',
+              subtitle: 'Закрытые цели и погашенные долги',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...archivedDebts.map(
+                    (d) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Долг: ${d.name}'),
+                      subtitle: Text(
+                        'остаток был ${fmtMoney(calc.debtRemain[d.id] ?? 0)} ₽ · '
+                        '${(calc.debtRemain[d.id] ?? 0) <= 0.004 ? 'долг погашен' : 'долг в архиве'}'
+                        '${d.archivedAt.isNotEmpty ? ' · ${fmtDateRu(d.archivedAt)}' : ''}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: TextButton(
+                        onPressed: () => c.updateDebt(d.id, archived: false),
+                        child: const Text('Вернуть'),
+                      ),
+                    ),
+                  ),
+                  ...archivedCats.map(
+                    (x) => Text(
+                      'Категория: ${x.name}',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                    ),
+                  ),
+                  ...archivedSavings.map(
+                    (x) => Text(
+                      'Цель: ${x.name}',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _catOps(Category cat) {
+    final ops =
+        c.state.history.where((h) => (h.expenses[cat.id] ?? 0) > 0).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Операции · ${cat.icon.isNotEmpty ? '${cat.icon} ' : ''}${cat.name}',
         ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ops.isEmpty
+              ? const Text('Операций пока нет', style: TextStyle(fontSize: 13))
+              : ListView(
+                  shrinkWrap: true,
+                  children: ops.take(c.state.recentOpsLimit).map((h) {
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        '−${fmtMoney(h.expenses[cat.id] ?? 0)} ₽',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        h.date,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Закрыть'),
+          ),
+        ],
       ),
     );
   }
@@ -516,7 +541,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
               ? const Text('Операций пока нет', style: TextStyle(fontSize: 13))
               : ListView(
                   shrinkWrap: true,
-                  children: ops.take(10).map((h) {
+                  children: ops.take(c.state.recentOpsLimit).map((h) {
                     final pay = h.debtPays[d.id] ?? 0;
                     final label = h.type == 'debt'
                         ? 'новый долг · ${fmtMoney(h.debtAmt)} ₽'
@@ -542,9 +567,69 @@ class _MoneyScreenState extends State<MoneyScreen> {
     );
   }
 
+  static const _icons = [
+    '',
+    '🏠',
+    '🍽',
+    '🚕',
+    '🛒',
+    '💊',
+    '🎓',
+    '🎬',
+    '✈️',
+    '👕',
+    '🐾',
+    '🎁',
+    '☕',
+    '🏋️',
+    '📱',
+    '💡',
+    '🔧',
+    '🏦',
+  ];
+
+  Future<void> _pickIcon(String current, ValueChanged<String> onPick) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Иконка категории'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _icons
+                .map(
+                  (icon) => InkWell(
+                    onTap: () => Navigator.pop(ctx, icon),
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppTheme.bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        icon.isEmpty ? '—' : icon,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+    if (picked != null) onPick(picked);
+  }
+
   Future<void> _addCategoryDialog() async {
     final name = TextEditingController();
     final plan = TextEditingController();
+    String icon = '';
     bool need = false;
     bool rare = false;
     final ok = await showDialog<bool>(
@@ -561,6 +646,19 @@ class _MoneyScreenState extends State<MoneyScreen> {
                   decoration: const InputDecoration(labelText: 'Название'),
                 ),
                 const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Text(
+                    icon.isEmpty ? '—' : icon,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  title: const Text('Иконка', style: TextStyle(fontSize: 13)),
+                  trailing: TextButton(
+                    onPressed: () =>
+                        _pickIcon(icon, (v) => setS(() => icon = v)),
+                    child: const Text('Выбрать'),
+                  ),
+                ),
                 TextField(
                   controller: plan,
                   keyboardType: TextInputType.number,
@@ -595,46 +693,75 @@ class _MoneyScreenState extends State<MoneyScreen> {
       ),
     );
     if (ok == true && name.text.trim().isNotEmpty) {
-      c.addCategory(name.text, need: need, rare: rare, plan: _d(plan.text));
+      c.addCategory(
+        name.text,
+        icon: icon,
+        need: need,
+        rare: rare,
+        plan: _d(plan.text),
+      );
     }
   }
 
   Future<void> _editCategoryDialog(Category cat) async {
     final name = TextEditingController(text: cat.name);
     final plan = TextEditingController(text: cat.plan?.amount.toString() ?? '');
+    String icon = cat.icon;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Редактировать категорию'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Название'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Редактировать категорию'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Название'),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Text(
+                    icon.isEmpty ? '—' : icon,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  title: const Text('Иконка', style: TextStyle(fontSize: 13)),
+                  trailing: TextButton(
+                    onPressed: () =>
+                        _pickIcon(icon, (v) => setS(() => icon = v)),
+                    child: const Text('Выбрать'),
+                  ),
+                ),
+                TextField(
+                  controller: plan,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'План, ₽'),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: plan,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'План, ₽'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Сохранить'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Сохранить'),
-          ),
-        ],
       ),
     );
     if (ok == true) {
-      c.updateCategory(cat.id, name: name.text, plan: _d(plan.text));
+      c.updateCategory(
+        cat.id,
+        name: name.text,
+        icon: icon,
+        plan: _d(plan.text),
+      );
     }
   }
 
