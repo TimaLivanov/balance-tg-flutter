@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_state.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/push_service.dart';
 import '../services/state_service.dart';
 import '../services/telegram_service.dart';
 
@@ -171,6 +172,16 @@ class AppController extends ChangeNotifier {
         return null;
       }
       return body['error']?.toString() ?? 'Не удалось отправить сообщение';
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Включить браузерные push-уведомления (аналог HTML-версии).
+  Future<String?> enablePush() async {
+    if (!_authenticated) return 'Сначала войдите в аккаунт';
+    try {
+      return await subscribePush();
     } catch (e) {
       return e.toString();
     }

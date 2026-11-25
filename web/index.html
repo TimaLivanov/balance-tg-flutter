@@ -50,6 +50,39 @@
           platform: tg.platform || ''
         });
       };
+
+      // Web Push — тот же сценарий, что был в HTML-версии.
+      window.__bbPushSubscribe = function () {
+        return (async function () {
+          if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            return 'Push не поддерживается этим браузером';
+          }
+          try {
+            if (!navigator.serviceWorker.controller) {
+              await navigator.serviceWorker.register('/sw.js');
+            }
+            const reg = await navigator.serviceWorker.ready;
+            const r = await fetch('/api/push/vapid-public');
+            const d = await r.json();
+            if (!d.publicKey) return 'VAPID-ключ не настроен на сервере';
+            const padding = '='.repeat((4 - d.publicKey.length % 4) % 4);
+            const raw = atob((d.publicKey + padding).replace(/-/g, '+').replace(/_/g, '/'));
+            const key = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; ++i) key[i] = raw.charCodeAt(i);
+            const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+            const resp = await fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(sub.toJSON())
+            });
+            if (!resp.ok) return 'Не удалось сохранить подписку';
+            return '';
+          } catch (e) {
+            return String(e && e.message ? e.message : e);
+          }
+        })();
+      };
     })();
   </script>
 </head>

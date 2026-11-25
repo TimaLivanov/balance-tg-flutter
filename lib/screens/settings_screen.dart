@@ -254,6 +254,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'Откройте приложение через бота Telegram, чтобы привязать уведомления.',
                       style: TextStyle(fontSize: 11, color: AppTheme.mutedLight),
                     ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async => _tgResult(await c.enablePush(), 'Push включён'),
+                      icon: const Icon(Icons.notifications_active, size: 16),
+                      label: const Text('Включить Push в браузере'),
+                    ),
+                  ),
                   if (c.telegramError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
