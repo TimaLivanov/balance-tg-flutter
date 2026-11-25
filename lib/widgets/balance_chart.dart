@@ -24,16 +24,16 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
   final window = tf == 'day'
       ? 14
       : tf == 'week'
-          ? 28
+          ? 7
           : tf == 'month'
               ? 30
               : 365;
   final sorted = List<DailyPoint>.from(points)
     ..sort((a, b) => a.date.compareTo(b.date));
-  final start = sorted.first.date;
-  final end = sorted.last.date;
-  var from = DateTime.parse(end).subtract(Duration(days: window - 1));
-  final first = DateTime.parse(start);
+  final now = DateTime.now();
+  final endKey = _key(now);
+  final first = DateTime.parse(sorted.first.date);
+  var from = DateTime(now.year, now.month, now.day).subtract(Duration(days: window - 1));
   if (from.isBefore(first)) from = first;
 
   final byDate = <String, List<double>>{};
@@ -44,10 +44,9 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
   final bars = <Bar>[];
   double prev = byDate[keys.first]!.first;
   for (var d = DateTime(from.year, from.month, from.day);
-      !d.isAfter(DateTime.parse(end));
+      _key(d).compareTo(endKey) <= 0;
       d = d.add(const Duration(days: 1))) {
-    final key =
-        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final key = _key(d);
     final vals = byDate[key];
     if (vals == null || vals.isEmpty) {
       bars.add(Bar(
@@ -81,6 +80,9 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
   }
   return bars;
 }
+
+String _key(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 class BalanceChart extends StatelessWidget {
   final List<Bar> bars;

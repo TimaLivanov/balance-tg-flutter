@@ -36,6 +36,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   late String _anTf;
   bool _anCandle = true;
   bool _ma = true;
+  double _zoom = 1;
   bool _expModeIncome = false;
   late DateTime _plusDate;
   final _question = TextEditingController();
@@ -377,6 +378,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         _pill(label, _anTf == _anTfKey(label), () => setState(() => _anTf = _anTfKey(label))),
                       _pill('Свечи', _anCandle, () => setState(() => _anCandle = true)),
                       _pill('Линия', !_anCandle, () => setState(() => _anCandle = false)),
+                      _pill('＋', false, () => setState(() => _zoom = (_zoom + .25).clamp(0.5, 2.5))),
+                      _pill('－', false, () => setState(() => _zoom = (_zoom - .25).clamp(0.5, 2.5))),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -387,7 +390,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           style: TextStyle(color: AppTheme.mutedLight))),
                     )
                   else
-                    BalanceChart(bars: bars, candle: _anCandle, ma: _ma),
+                    BalanceChart(bars: bars, candle: _anCandle, ma: _ma, zoom: _zoom),
+                  if (bars.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _ohlc('Откр.', bars.first.open),
+                        _ohlc('Макс.', bars.map((b) => b.high).reduce((a, b) => a > b ? a : b)),
+                        _ohlc('Мин.', bars.map((b) => b.low).reduce((a, b) => a < b ? a : b)),
+                        _ohlc('Закр.', bars.last.close),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -745,6 +760,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
+
+  Widget _ohlc(String label, double value) => Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.mutedLight)),
+          FittedBox(
+            child: Text(fmtMoney(value),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      );
 
   Widget _smallStat(String label, String value, Color color) => Container(
         padding: const EdgeInsets.all(8),
