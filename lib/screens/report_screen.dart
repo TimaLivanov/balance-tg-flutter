@@ -94,8 +94,7 @@ class _ReportScreenState extends State<ReportScreen> {
           '<style>body{font:15px/1.6 system-ui;max-width:760px;margin:40px auto;padding:0 20px;color:#111827}'
           'pre{white-space:pre-wrap}</style></head><body><pre>$text</pre></body></html>',
     );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Отчёт скачан')));
+    appToast(context, 'Отчёт скачан', c.state);
   }
 
   @override
@@ -161,9 +160,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 icon: const Icon(Icons.copy),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _buildReport()));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Отчёт скопирован')),
-                  );
+                  appToast(context, 'Отчёт скопирован', c.state);
                 },
               ),
             ],

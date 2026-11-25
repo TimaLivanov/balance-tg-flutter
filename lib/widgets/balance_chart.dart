@@ -218,18 +218,14 @@ class _BalanceChartState extends State<BalanceChart> {
   final ValueNotifier<Offset?> _cursor = ValueNotifier(null);
   final Map<int, Offset> _pointers = {};
 
-  Offset? _panStart;
   double _startOffset = 0;
   double _startCell = 1;
+  double _dragAccum = 0;
 
-  /// 0 — направление жеста ещё не ясно, 1 — горизонтальный, 2 — вертикальный.
-  /// Вертикальный жест отдаём родительскому скроллу.
-  int _panAxis = 0;
-
+  /// Щипок считаем через Listener: ScaleGestureRecognizer перехватывает
+  /// вертикальный жест и тормозит скролл страницы в Telegram.
   double? _pinchDistance;
   double? _pinchStartCount;
-  double? _pinchStartOffset;
-  Offset? _pinchCenter;
 
   @override
   void initState() {
@@ -294,140 +290,126 @@ class _BalanceChartState extends State<BalanceChart> {
     final (start, end) = _window();
     final show = widget.bars.sublist(start, end);
 
-    return SizedBox(
-      height: widget.height,
-      child: MouseRegion(
-        onExit: (_) {
-          if (_pointers.isEmpty) _cursor.value = null;
+    // Высота задаётся только области графика: сводка по свече должна
+    // расширять виджет, иначе она перекрывается следующим блоком экрана.
+    return MouseRegion(
+      onExit: (_) {
+        if (_pointers.isEmpty) _cursor.value = null;
+      },
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (e) {
+          if (e.kind == PointerDeviceKind.mouse) _setCandle(e.localPosition);
+          _pointers[e.pointer] = e.localPosition;
+          _cursor.value = e.localPosition;
+          if (_pointers.length == 2) {
+            final p = _pointers.values.toList();
+            _pinchDistance = (p[0] - p[1]).distance;
+            _pinchStartCount = _barCount.toDouble();
+          }
         },
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (e) {
-            // Клик мышью фиксирует свечу; прикосновение — только при тапе.
-            if (e.kind == PointerDeviceKind.mouse) _setCandle(e.localPosition);
-            _pointers[e.pointer] = e.localPosition;
-            _cursor.value = e.localPosition;
-            if (_pointers.length == 1) {
-              _panAxis = 0;
-              _panStart = e.localPosition;
-              _startOffset = _rightOffset;
-              _startCell = _cellFor(
-                (context.findRenderObject() as RenderBox?)?.size.width ?? 320,
-              );
-            } else if (_pointers.length == 2) {
-              final p = _pointers.values.toList();
-              _pinchDistance = (p[0] - p[1]).distance;
-              _pinchCenter = (p[0] + p[1]) / 2;
-              _pinchStartCount = _barCount.toDouble();
-              _pinchStartOffset = _rightOffset;
-            }
-          },
-          onPointerMove: (e) {
-            if (!_pointers.containsKey(e.pointer)) {
-              // Наведение мыши тоже показывает сводку по свече.
-              if (e.kind == PointerDeviceKind.mouse)
-                _setCandle(e.localPosition);
-              return;
-            }
-            _pointers[e.pointer] = e.localPosition;
-            _cursor.value = e.localPosition;
-            final width =
-                (context.findRenderObject() as RenderBox?)?.size.width ?? 320;
-            if (_pointers.length >= 2 &&
-                _pinchDistance != null &&
-                _pinchDistance! > 1) {
-              final p = _pointers.values.take(2).toList();
-              final dist = (p[0] - p[1]).distance;
-              final center = (p[0] + p[1]) / 2;
-              final count = (_pinchStartCount! * _pinchDistance! / dist)
-                  .round()
-                  .clamp(8, 120);
-              final cell = _cellFor(width);
+        onPointerMove: (e) {
+          _pointers[e.pointer] = e.localPosition;
+          if (_pointers.length == 2 &&
+              _pinchDistance != null &&
+              _pinchStartCount != null &&
+              _pinchDistance! > 0) {
+            final p = _pointers.values.toList();
+            final ratio = (p[0] - p[1]).distance / _pinchDistance!;
+            final count = (_pinchStartCount! / ratio).round().clamp(8, 120);
+            if (count != _barCount) {
               setState(() {
                 _barCount = count;
-                _rightOffset =
-                    (_pinchStartOffset! + (center.dx - _pinchCenter!.dx) / cell)
-                        .clamp(0, math.max(0, widget.bars.length - count))
-                        .toDouble();
+                _rightOffset = _rightOffset
+                    .clamp(0, math.max(0, widget.bars.length - count))
+                    .toDouble();
               });
-            } else if (_pointers.length == 1 && _panStart != null) {
-              final dx = e.localPosition.dx - _panStart!.dx;
-              final dy = e.localPosition.dy - _panStart!.dy;
-              if (_panAxis == 0 && (dx.abs() > 6 || dy.abs() > 6)) {
-                _panAxis = dx.abs() > dy.abs() ? 1 : 2;
-              }
-              // Вертикальный жест не трогаем: пусть скроллится страница.
-              if (_panAxis == 1) {
-                setState(() {
-                  _rightOffset = (_startOffset + dx / _startCell)
-                      .clamp(0, _maxOffset)
-                      .toDouble();
-                });
-              }
             }
-          },
-          onPointerUp: (e) => _endPointer(e.pointer),
-          onPointerCancel: (e) => _endPointer(e.pointer),
-          onPointerHover: (e) {
+            return;
+          }
+          if (e.kind == PointerDeviceKind.mouse) {
             _cursor.value = e.localPosition;
             _setCandle(e.localPosition);
+          }
+        },
+        onPointerUp: (e) => _endPointer(e.pointer),
+        onPointerCancel: (e) => _endPointer(e.pointer),
+        onPointerHover: (e) {
+          _cursor.value = e.localPosition;
+          _setCandle(e.localPosition);
+        },
+        onPointerSignal: (e) {
+          // Обычное колесо/скролл листает экран, масштаб — только с Ctrl/Cmd.
+          final zoomModifier =
+              HardwareKeyboard.instance.isControlPressed ||
+              HardwareKeyboard.instance.isMetaPressed;
+          if (e is PointerScrollEvent && zoomModifier) {
+            setState(() {
+              _barCount = (_barCount + (e.scrollDelta.dy > 0 ? 2 : -2)).clamp(
+                8,
+                120,
+              );
+              _rightOffset = _rightOffset.clamp(0, _maxOffset).toDouble();
+            });
+          }
+        },
+        // Только жесты, участвующие в арене, чтобы родительский скролл
+        // не подхватывал горизонтальное движение по графику.
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) {
+            _dragAccum = 0;
+            _startOffset = _rightOffset;
+            _startCell = _cellFor(
+              (context.findRenderObject() as RenderBox?)?.size.width ?? 320,
+            );
           },
-          onPointerSignal: (e) {
-            // Обыное колесо/скролл должно листать экран, а не масштабировать график.
-            final zoomModifier =
-                HardwareKeyboard.instance.isControlPressed ||
-                HardwareKeyboard.instance.isMetaPressed;
-            if (e is PointerScrollEvent && zoomModifier) {
-              setState(() {
-                _barCount = (_barCount + (e.scrollDelta.dy > 0 ? 2 : -2)).clamp(
-                  8,
-                  120,
-                );
-                _rightOffset = _rightOffset.clamp(0, _maxOffset).toDouble();
-              });
-            }
+          onHorizontalDragUpdate: (d) {
+            _dragAccum += d.delta.dx;
+            setState(() {
+              _rightOffset = (_startOffset + _dragAccum / _startCell)
+                  .clamp(0, _maxOffset)
+                  .toDouble();
+            });
           },
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapUp: (d) {
-              if (d.kind != PointerDeviceKind.mouse)
-                _setCandle(d.localPosition);
-            },
-            onDoubleTap: _reset,
-            child: ValueListenableBuilder<int?>(
-              valueListenable: _pinnedCandle,
-              builder: (context, pinned, _) => ValueListenableBuilder<Offset?>(
-                valueListenable: _cursor,
-                builder: (context, cursor, _) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        height: widget.height,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return CustomPaint(
-                              size: Size(constraints.maxWidth, widget.height),
-                              painter: _BalanceChartPainter(
-                                bars: show,
-                                candle: widget.candle,
-                                ma: widget.ma,
-                                cursor: cursor,
-                                pinnedCandle: pinned,
-                              ),
-                            );
-                          },
-                        ),
+          onHorizontalDragEnd: (_) {},
+          onTapUp: (d) {
+            if (d.kind != PointerDeviceKind.mouse) _setCandle(d.localPosition);
+          },
+          onDoubleTap: _reset,
+          child: ValueListenableBuilder<int?>(
+            valueListenable: _pinnedCandle,
+            builder: (context, pinned, _) => ValueListenableBuilder<Offset?>(
+              valueListenable: _cursor,
+              builder: (context, cursor, _) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: widget.height,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return CustomPaint(
+                            size: Size(constraints.maxWidth, widget.height),
+                            painter: _BalanceChartPainter(
+                              bars: show,
+                              candle: widget.candle,
+                              ma: widget.ma,
+                              cursor: cursor,
+                              pinnedCandle: pinned,
+                            ),
+                          );
+                        },
                       ),
-                      if (widget.showSummary &&
-                          pinned != null &&
-                          pinned >= 0 &&
-                          pinned < show.length)
-                        _CandleSummary(bar: show[pinned]),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                    if (widget.showSummary &&
+                        pinned != null &&
+                        pinned >= 0 &&
+                        pinned < show.length)
+                      _CandleSummary(bar: show[pinned]),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -440,18 +422,8 @@ class _BalanceChartState extends State<BalanceChart> {
     if (_pointers.length < 2) {
       _pinchDistance = null;
       _pinchStartCount = null;
-      _pinchStartOffset = null;
-      _pinchCenter = null;
     }
-    if (_pointers.isEmpty) {
-      _panStart = null;
-      _panAxis = 0;
-      // Курсор мыши остаётся, чтобы сводка не мигала при уходе пальца.
-      if (!kIsWeb) _cursor.value = null;
-    } else {
-      _panStart = _pointers.values.first;
-      _startOffset = _rightOffset;
-    }
+    if (_pointers.isEmpty && !kIsWeb) _cursor.value = null;
   }
 }
 

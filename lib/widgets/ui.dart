@@ -2,6 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
 import '../theme/app_theme.dart';
+import '../models/app_state.dart';
+
+/// Уведомление с учётом настроек «Время показа» и
+/// «Не исчезать, пока не нажму» (аналог toast() из HTML-версии).
+void appToast(BuildContext context, String message, AppState state) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  messenger.hideCurrentSnackBar();
+  final duration = switch (state.toastMode) {
+    'short' => const Duration(seconds: 4),
+    'normal' => const Duration(seconds: 8),
+    'long' => const Duration(seconds: 15),
+    'custom' => Duration(seconds: state.toastSec < 1 ? 1 : state.toastSec),
+    _ => const Duration(seconds: 3),
+  };
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: state.toastSticky ? const Duration(days: 365) : duration,
+      action: SnackBarAction(
+        label: 'ОК',
+        onPressed: messenger.hideCurrentSnackBar,
+      ),
+    ),
+  );
+}
 
 String fmtMoney(double v) => v
     .toStringAsFixed(0)

@@ -95,8 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _tgResult(String? error, String okText) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(error ?? okText)));
+    appToast(context, error ?? okText, c.state);
   }
 
   @override
@@ -181,6 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 SwitchListTile(
+                  key: const Key('toast-sticky-switch'),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Не исчезать, пока не нажму'),
                   value: s.toastSticky,
@@ -216,6 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final i = e.key;
                   final t = e.value;
                   return ListTile(
+                    key: ValueKey('tg-time-$i-$t'),
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
                       radius: 12,
@@ -259,8 +260,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }),
                 if (s.tgNotifyTimes.length < 10)
                   TextButton.icon(
-                    onPressed: () =>
-                        c.updateSetting((x) => x.tgNotifyTimes.add('19:00')),
+                    onPressed: () => c.updateSetting((x) {
+                      // Берём первое свободное время, чтобы строка реально
+                      // добавилась и была сразу видна в списке.
+                      const candidates = [
+                        '08:00',
+                        '10:00',
+                        '14:00',
+                        '16:00',
+                        '18:00',
+                        '20:00',
+                        '21:00',
+                        '22:00',
+                        '06:00',
+                        '00:00',
+                      ];
+                      final next = candidates.firstWhere(
+                        (v) => !x.tgNotifyTimes.contains(v),
+                        orElse: () => '23:00',
+                      );
+                      x.tgNotifyTimes.add(next);
+                    }),
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text('Добавить время'),
                   ),

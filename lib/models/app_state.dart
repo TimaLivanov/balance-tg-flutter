@@ -457,12 +457,11 @@ class AppState {
     if (incomeCats.isEmpty) {
       incomeCats.add(IncomeCategory(id: '1', name: 'Работа'));
     }
+    // Не дополняем список до 10: иначе добавление/удаление времени
+    // видно только после перезапуска, когда состояние загружено заново.
     final tgTimes = _list(json['tgNotifyTimes'])
         .map((e) => e.toString())
         .toList();
-    while (tgTimes.length < 10) {
-      tgTimes.add(const ['07:00', '12:00', '19:00'][tgTimes.length % 3]);
-    }
     return AppState(
       v: _int(json['v'], fallback: 12),
       startCash: _num(json['startCash']),

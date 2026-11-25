@@ -32,7 +32,9 @@ class Heatmap extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = (items.length * 58).clamp(180, 320).toDouble();
-        final width = constraints.maxWidth.isFinite ? constraints.maxWidth : 320.0;
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 320.0;
         final placed = _squarify(items, Size(width, height), 4);
         return SizedBox(
           height: height,
@@ -60,7 +62,9 @@ List<_Placed> _squarify(List<HeatItem> items, Size size, double gap) {
   if (valid.isEmpty || size.width <= 0 || size.height <= 0) return const [];
 
   final total = valid.fold<double>(0, (sum, x) => sum + x.amount);
-  final areas = [for (final x in valid) size.width * size.height * x.amount / total];
+  final areas = [
+    for (final x in valid) size.width * size.height * x.amount / total,
+  ];
   final left = List<int>.generate(valid.length, (i) => i);
   var x = 0.0;
   var y = 0.0;
@@ -190,7 +194,10 @@ class _Tile extends StatelessWidget {
                       tiny,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
                 ],
@@ -199,7 +206,8 @@ class _Tile extends StatelessWidget {
           );
         }
         return Tooltip(
-          message: '${item.name}\n$tiny${pct == null ? '' : ' · ${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%'}',
+          message:
+              '${item.name}\n$tiny${pct == null ? '' : ' · ${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(1)}%'}',
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Container(color: color, child: child),

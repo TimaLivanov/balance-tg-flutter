@@ -178,9 +178,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 c.commit();
               }
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Примечание обновлено')),
-              );
+              appToast(context, 'Примечание обновлено', c.state);
             },
             child: const Text('Сохранить'),
           ),
@@ -201,8 +199,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ).then((ok) {
       if (ok == true) {
         c.deleteEntry(e.id);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Удалено: ${_describe(e)}')));
+        appToast(context, 'Удалено: ${_describe(e)}', c.state);
       }
     });
   }
@@ -213,8 +210,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ..sort((a, b) => b.date.compareTo(a.date));
     final last = sorted.first;
     c.deleteEntry(last.id);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Отменено: ${_describe(last)}')));
+    appToast(context, 'Отменено: ${_describe(last)}', c.state);
   }
 
   void _export() {
@@ -485,6 +481,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _toast(String s) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
+    appToast(context, s, c.state);
   }
 }

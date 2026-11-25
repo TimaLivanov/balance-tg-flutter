@@ -16,6 +16,8 @@ class MoneyScreen extends StatefulWidget {
 class _MoneyScreenState extends State<MoneyScreen> {
   AppController get c => widget.controller;
 
+  bool _archiveExpanded = false;
+
   String _shown(double v) => c.state.hideBal ? '••••' : fmtMoney(v);
 
   @override
@@ -51,6 +53,50 @@ class _MoneyScreenState extends State<MoneyScreen> {
           const SizedBox(height: 20),
 
           SectionCard(
+            title: 'Подушка',
+            subtitle: '${c.state.cushionMonths} месяцев запаса',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Сейчас', style: TextStyle(fontSize: 13)),
+                    Text(
+                      '${fmtMoney(calc.cushion)} ₽',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Цель', style: TextStyle(fontSize: 13)),
+                    Text(
+                      '${fmtMoney(calc.cushionGoal)} ₽',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ProgressLine(
+                  value: calc.cushionPct / 100,
+                  color: AppTheme.success,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  calc.cushionRemaining > 0
+                      ? 'До цели ${fmtMoney(calc.cushionRemaining)} ₽ · рек. ${fmtMoney(calc.cushionRecPerDay)} ₽/день'
+                      : 'Цель набрана',
+                  style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          SectionCard(
             title: 'Категории расходов',
             subtitle: '${cats.length} активных',
             action: TextButton.icon(
@@ -62,6 +108,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                 ? const _Empty('Пока нет категорий')
                 : Column(
                     children: cats.map((cat) {
+                      final st = catStats(c.state, cat);
                       final plan = cat.plan;
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -90,22 +137,74 @@ class _MoneyScreenState extends State<MoneyScreen> {
                             Expanded(child: Text(cat.name)),
                             if (cat.need) _Tag('обяз.', AppTheme.primary),
                             if (cat.rare) const _Tag('редк.', AppTheme.warning),
+                            if (st.overdue)
+                              const _Tag('срок прошёл', AppTheme.danger),
                           ],
                         ),
-                        subtitle: Text(
-                          plan != null
-                              ? 'План ${fmtMoney(plan.amount)} ₽ · ${plan.date}'
-                              : 'Без плана',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (v) => _catAction(v, cat.id),
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Редактировать'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (plan != null)
+                              Text(
+                                'План ${fmtMoney(plan.amount)} ₽'
+                                '${plan.date.isNotEmpty ? ' до ${fmtDateRu(plan.date)}' : ''}'
+                                '${st.remaining != null ? ' · осталось ${_shown(st.remaining!)} ₽' : ''}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            Text(
+                              'отдано ${_shown(st.totalSpent)} ₽'
+                              '${st.spentWin > 0.004 ? ' · за окно ${_shown(st.spentWin)} ₽' : ''}',
+                              style: const TextStyle(fontSize: 11),
                             ),
-                            PopupMenuItem(value: 'del', child: Text('Удалить')),
+                            if (st.avgDay > 0.004)
+                              Text(
+                                'рек. ${fmtRec(st.avgDay)} ₽ / день',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            if (st.minDay != null && st.minDay! > 0.004)
+                              Text(
+                                'мин. ${fmtRec(st.minDay!)} ₽ / день',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF06B6D4),
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.restart_alt, size: 19),
+                              tooltip: 'Сбросить прогресс плана',
+                              onPressed: () =>
+                                  confirmDialog(
+                                    context,
+                                    title: 'Сбросить «отдано»?',
+                                    message:
+                                        'Прогресс по «${cat.name}» начнётся заново. '
+                                        'Баланс и история не изменятся.',
+                                    confirm: 'Сбросить',
+                                  ).then((ok) {
+                                    if (ok == true) c.resetCategory(cat.id);
+                                  }),
+                            ),
+                            PopupMenuButton<String>(
+                              onSelected: (v) => _catAction(v, cat.id),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Редактировать'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'del',
+                                  child: Text('Удалить'),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       );
@@ -298,50 +397,6 @@ class _MoneyScreenState extends State<MoneyScreen> {
           const SizedBox(height: 16),
 
           SectionCard(
-            title: 'Подушка',
-            subtitle: '${c.state.cushionMonths} месяцев запаса',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Сейчас', style: TextStyle(fontSize: 13)),
-                    Text(
-                      '${fmtMoney(calc.cushion)} ₽',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Цель', style: TextStyle(fontSize: 13)),
-                    Text(
-                      '${fmtMoney(calc.cushionGoal)} ₽',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ProgressLine(
-                  value: calc.cushionPct / 100,
-                  color: AppTheme.success,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  calc.cushionRemaining > 0
-                      ? 'До цели ${fmtMoney(calc.cushionRemaining)} ₽ · рек. ${fmtMoney(calc.cushionRecPerDay)} ₽/день'
-                      : 'Цель набрана',
-                  style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          SectionCard(
             title: 'Доходные категории',
             action: TextButton.icon(
               onPressed: () => _addIncomeCatDialog(),
@@ -405,40 +460,69 @@ class _MoneyScreenState extends State<MoneyScreen> {
             const SizedBox(height: 16),
             SectionCard(
               title: 'Архив',
-              subtitle: 'Закрытые цели и погашенные долги',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ...archivedDebts.map(
-                    (d) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('Долг: ${d.name}'),
-                      subtitle: Text(
-                        'остаток был ${fmtMoney(calc.debtRemain[d.id] ?? 0)} ₽ · '
-                        '${(calc.debtRemain[d.id] ?? 0) <= 0.004 ? 'долг погашен' : 'долг в архиве'}'
-                        '${d.archivedAt.isNotEmpty ? ' · ${fmtDateRu(d.archivedAt)}' : ''}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      trailing: TextButton(
-                        onPressed: () => c.updateDebt(d.id, archived: false),
-                        child: const Text('Вернуть'),
-                      ),
-                    ),
-                  ),
-                  ...archivedCats.map(
-                    (x) => Text(
-                      'Категория: ${x.name}',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                    ),
-                  ),
-                  ...archivedSavings.map(
-                    (x) => Text(
-                      'Цель: ${x.name}',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                    ),
-                  ),
-                ],
+              subtitle: _archiveExpanded
+                  ? 'Закрытые цели и погашенные долги'
+                  : '${archivedDebts.length + archivedCats.length + archivedSavings.length} записей · нажмите развернуть',
+              action: IconButton(
+                icon: Icon(
+                  _archiveExpanded ? Icons.expand_less : Icons.expand_more,
+                ),
+                tooltip: _archiveExpanded
+                    ? 'Свернуть архив'
+                    : 'Развернуть архив',
+                onPressed: () =>
+                    setState(() => _archiveExpanded = !_archiveExpanded),
               ),
+              child: _archiveExpanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ...archivedDebts.map(
+                          (d) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Долг: ${d.name}'),
+                            subtitle: Text(
+                              'остаток был ${fmtMoney(calc.debtRemain[d.id] ?? 0)} ₽ · '
+                              '${(calc.debtRemain[d.id] ?? 0) <= 0.004 ? 'долг погашен' : 'долг в архиве'}'
+                              '${d.archivedAt.isNotEmpty ? ' · ${fmtDateRu(d.archivedAt)}' : ''}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () =>
+                                  c.updateDebt(d.id, archived: false),
+                              child: const Text('Вернуть'),
+                            ),
+                          ),
+                        ),
+                        ...archivedCats.map(
+                          (x) => Text(
+                            'Категория: ${x.name}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ),
+                        ...archivedSavings.map(
+                          (x) => Text(
+                            'Цель: ${x.name}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SizedBox(
+                      height: 34,
+                      child: Center(
+                        child: Text(
+                          'Нажмите ↕, чтобы посмотреть архив',
+                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ],

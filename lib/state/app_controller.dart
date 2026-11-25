@@ -324,6 +324,38 @@ class AppController extends ChangeNotifier {
     commit();
   }
 
+  /// Сброс «отдано» по категории (↺ в HTML): база = все текущие траты,
+  /// просроченный срок плана снимается, чтобы можно было собрать заново.
+  void resetCategory(String id) {
+    final idx = _state.cats.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    final c = _state.cats[idx];
+    var allTime = 0.0;
+    for (final e in _state.history) {
+      if (e.type != 'day') continue;
+      allTime += e.expenses[id] ?? 0;
+    }
+    final today = _dateKey(DateTime.now());
+    Plan? plan = c.plan;
+    if (plan != null) {
+      var date = plan.date;
+      if (date.isNotEmpty && date.compareTo(today) < 0) date = '';
+      plan = Plan(amount: plan.amount, date: date, start: today);
+    }
+    _state.cats[idx] = Category(
+      id: c.id,
+      name: c.name,
+      icon: c.icon,
+      need: c.need,
+      rare: c.rare,
+      archived: c.archived,
+      resetDate: today,
+      spentBase: allTime,
+      plan: plan,
+    );
+    commit();
+  }
+
   void addDebt(
     String name,
     double amount, {
@@ -937,7 +969,7 @@ CalcResult recalc(AppState s) {
   final balance = cash + cushion + savings - debts;
 
   // Цель подушки (аналог cushionMonthBase/cushionAnalysis).
-  final monthlyBase = _monthlyBase(s, entries);
+  final monthlyBase = _monthlyBase(s);
   final goal = monthlyBase * s.cushionMonths;
   final remaining = goal - cushion;
   final pct = goal > 0 ? (cushion / goal * 100).clamp(0, 100).toDouble() : 0.0;
@@ -964,13 +996,99 @@ CalcResult recalc(AppState s) {
   );
 }
 
-double _monthlyBase(AppState s, List<Entry> entries) {
-  if (s.windowDays <= 0) return 0;
+/// Статистика категории (аналог catStats() из HTML):
+/// рек. = траты за окно / дни с тратами, мин. = остаток плана / дни до срока.
+class CatStats {
+  final double avgDay;
+  final double spentWin;
+  final double totalSpent;
+  final int span;
+  final double? minDay;
+  final double? remaining;
+  final int? daysLeft;
+  final bool overdue;
+  final bool done;
 
+  CatStats({
+    required this.avgDay,
+    required this.spentWin,
+    required this.totalSpent,
+    required this.span,
+    required this.minDay,
+    required this.remaining,
+    required this.daysLeft,
+    required this.overdue,
+    required this.done,
+  });
+}
+
+CatStats catStats(AppState s, Category cat) {
   final today = DateTime.now();
   final todayStr = _dateKey(today);
-  final from = today.subtract(Duration(days: s.windowDays - 1));
-  final fromStr = _dateKey(from);
+  final fromStr = _dateKey(today.subtract(Duration(days: s.windowDays - 1)));
+  final dayEntries = s.history.where((e) => e.type == 'day').toList();
+
+  var spentWin = 0.0;
+  var allTime = 0.0;
+  final daysWith = <String>{};
+  for (final e in dayEntries) {
+    final v = e.expenses[cat.id] ?? 0;
+    if (v <= 0) continue;
+    allTime += v;
+    if (e.date.compareTo(fromStr) >= 0 && e.date.compareTo(todayStr) <= 0) {
+      spentWin += v;
+      daysWith.add(e.date);
+    }
+  }
+
+  final base = cat.spentBase > allTime ? allTime : cat.spentBase;
+  final totalSpent = (allTime - base) > 0 ? allTime - base : 0.0;
+  final span = daysWith.isEmpty
+      ? s.windowDays < dayEntries.length
+            ? s.windowDays
+            : (dayEntries.isEmpty ? 1 : dayEntries.length)
+      : daysWith.length;
+  final avgDay = spentWin / span;
+
+  double? minDay;
+  double? remaining;
+  int? daysLeft;
+  var overdue = false;
+  var done = false;
+  final plan = cat.plan;
+  if (plan != null && plan.amount > 0) {
+    remaining = (plan.amount - totalSpent) > 0 ? plan.amount - totalSpent : 0.0;
+    done = totalSpent >= plan.amount;
+    overdue =
+        plan.date.isNotEmpty &&
+        plan.date.compareTo(todayStr) < 0 &&
+        remaining > 0.004;
+    if (plan.date.isNotEmpty && remaining > 0) {
+      final due = DateTime.tryParse(plan.date);
+      if (due != null) {
+        final raw = _dayDiff(today, due) + 1;
+        final left = raw < 1 ? 1 : raw;
+        daysLeft = left;
+        minDay = remaining / left;
+      }
+    }
+  }
+
+  return CatStats(
+    avgDay: avgDay,
+    spentWin: spentWin,
+    totalSpent: totalSpent,
+    span: span,
+    minDay: minDay,
+    remaining: remaining,
+    daysLeft: daysLeft,
+    overdue: overdue,
+    done: done,
+  );
+}
+
+double _monthlyBase(AppState s) {
+  if (s.windowDays <= 0) return 0;
 
   bool pick(Category c) {
     if (s.cushionInclude == 'all') return true;
@@ -978,49 +1096,10 @@ double _monthlyBase(AppState s, List<Entry> entries) {
     return c.need;
   }
 
-  final cats = s.cats.where((c) => !c.archived && pick(c)).toList();
-  final dayEntries = entries.where((e) => e.type == 'day').toList();
   double month = 0;
-
-  for (final cat in cats) {
-    double spentWin = 0;
-    double allTime = 0;
-    final daysWith = <String>{};
-    for (final e in dayEntries) {
-      final v = e.expenses[cat.id] ?? 0;
-      if (v <= 0) continue;
-      allTime += v;
-      if (e.date.compareTo(fromStr) >= 0 && e.date.compareTo(todayStr) <= 0) {
-        spentWin += v;
-        daysWith.add(e.date);
-      }
-    }
-    final span = daysWith.isEmpty
-        ? s.windowDays < dayEntries.length
-              ? s.windowDays
-              : (dayEntries.isEmpty ? 1 : dayEntries.length)
-        : daysWith.length;
-    final avgDay = spentWin / span;
-    final base = cat.spentBase > allTime ? allTime : cat.spentBase;
-    final totalSpent = (allTime - base) > 0 ? allTime - base : 0.0;
-
-    double? minDay;
-    final plan = cat.plan;
-    if (plan != null && plan.amount > 0) {
-      final remaining = plan.amount - totalSpent > 0
-          ? plan.amount - totalSpent
-          : 0.0;
-      if (remaining > 0 && plan.date.isNotEmpty) {
-        final due = DateTime.tryParse(plan.date);
-        if (due != null) {
-          final daysLeft = _dayDiff(today, due) + 1 < 1
-              ? 1
-              : _dayDiff(today, due) + 1;
-          minDay = remaining / daysLeft;
-        }
-      }
-    }
-
+  for (final cat in s.cats.where((c) => !c.archived && pick(c))) {
+    final avgDay = catStats(s, cat).avgDay;
+    final minDay = catStats(s, cat).minDay;
     if (s.cushionBase == 'min') {
       if (minDay != null && minDay > 0) {
         month += minDay * 30;

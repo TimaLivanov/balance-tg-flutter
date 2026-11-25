@@ -95,7 +95,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    appToast(context, msg, c.state);
   }
 
   String _tipOfDay() {

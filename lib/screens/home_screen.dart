@@ -19,23 +19,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  /// Экраны создаются один раз: при каждом notifyListeners() не нужно
-  /// пересоздавать дерево и сбрасывать позицию прокрутки.
-  late final List<Widget> _screens;
-
-  @override
-  void initState() {
-    super.initState();
-    final controller = widget.controller;
-    _screens = [
-      DashboardScreen(controller: controller),
-      MoneyScreen(controller: controller),
-      AnalyticsScreen(controller: controller),
-      HistoryScreen(controller: controller),
-      ReportScreen(controller: controller),
-      SettingsScreen(controller: controller),
-    ];
-  }
+  /// Создаём новые экземпляры при каждой пересборке: иначе Flutter видит
+  /// те же объекты в IndexedStack и не обновляет экраны после записи операции.
+  /// Состояние и позиция скролла сохраняются (PageStorageKey + State).
+  List<Widget> _screens(AppController controller) => [
+    DashboardScreen(controller: controller),
+    MoneyScreen(controller: controller),
+    AnalyticsScreen(controller: controller),
+    HistoryScreen(controller: controller),
+    ReportScreen(controller: controller),
+    SettingsScreen(controller: controller),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: widget.controller,
       builder: (context, _) {
         return Scaffold(
-          body: IndexedStack(index: _selectedIndex, children: _screens),
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: _screens(widget.controller),
+          ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,

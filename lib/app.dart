@@ -30,32 +30,35 @@ class _BalanceAppState extends State<BalanceApp> {
 
   @override
   Widget build(BuildContext context) {
-    AppTheme.applyAccent(_controller.state.accent);
-    AppTheme.applyTheme(_controller.state.theme);
-    final scale = switch (_controller.state.fontSize) {
-      's' => 0.9,
-      'l' => 1.15,
-      _ => 1.0,
-    };
-    Widget home(BuildContext context) => MediaQuery(
-      data: MediaQuery.of(context)
-          .copyWith(textScaler: TextScaler.linear(scale)),
-      child: _controller.authenticated || _controller.guest
-          ? HomeScreen(controller: _controller)
-          : LoginScreen(controller: _controller),
-    );
-
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
+        // Применяем настройки внутри builder: иначе смена темы, акцента
+        // или размера шрифта не доходит до MaterialApp после notifyListeners().
+        AppTheme.applyAccent(_controller.state.accent);
+        AppTheme.applyTheme(_controller.state.theme);
+        final scale = switch (_controller.state.fontSize) {
+          's' => 0.9,
+          'l' => 1.15,
+          _ => 1.0,
+        };
+        Widget home(BuildContext context) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: _controller.authenticated || _controller.guest
+              ? HomeScreen(controller: _controller)
+              : LoginScreen(controller: _controller),
+        );
+
+        final builder = (context, child) => ScrollConfiguration(
+          behavior: AppScrollBehavior(),
+          child: child ?? const SizedBox.shrink(),
+        );
         if (_controller.loading) {
           return MaterialApp(
             title: 'BitBalance',
             debugShowCheckedModeBanner: false,
-            builder: (context, child) => ScrollConfiguration(
-              behavior: AppScrollBehavior(),
-              child: child ?? const SizedBox.shrink(),
-            ),
+            builder: builder,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
@@ -67,10 +70,7 @@ class _BalanceAppState extends State<BalanceApp> {
         return MaterialApp(
           title: 'BitBalance',
           debugShowCheckedModeBanner: false,
-          builder: (context, child) => ScrollConfiguration(
-            behavior: AppScrollBehavior(),
-            child: child ?? const SizedBox.shrink(),
-          ),
+          builder: builder,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
