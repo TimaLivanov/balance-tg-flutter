@@ -11,7 +11,10 @@ class AuthService {
   }
 
   Future<http.Response> register(String email, String password) {
-    return _api.post('/api/auth/register', {'email': email, 'password': password});
+    return _api.post('/api/auth/register', {
+      'email': email,
+      'password': password,
+    });
   }
 
   Future<http.Response> me() => _api.get('/api/auth/me');

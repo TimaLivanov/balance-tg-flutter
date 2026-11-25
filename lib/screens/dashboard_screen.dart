@@ -18,7 +18,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late String _tf;
   late bool _candle;
   bool _ma = false;
-  double _zoom = 1;
   bool _formExpanded = false;
 
   final _quickIncome = TextEditingController();
@@ -67,12 +66,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  String get _today => _dateStr(DateTime.now().add(Duration(days: _quickOffset)));
+  String get _today =>
+      _dateStr(DateTime.now().add(Duration(days: _quickOffset)));
 
   static String _dateStr(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  double _num(TextEditingController ctrl) => double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
+  double _num(TextEditingController ctrl) =>
+      double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
 
   String _shown(double v, {String suffix = ' ₽'}) =>
       c.state.hideBal ? '••••' : '${fmtMoney(v)}$suffix';
@@ -92,14 +93,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (kind == 'inc') {
       final amt = _num(_quickIncome);
       if (amt <= 0) return _toast('Введите сумму дохода');
-      _quickIncomeCat ??= c.state.incomeCats.isNotEmpty ? c.state.incomeCats.first.id : '1';
+      _quickIncomeCat ??= c.state.incomeCats.isNotEmpty
+          ? c.state.incomeCats.first.id
+          : '1';
       c.saveDayEntry(
         date: date,
         income: amt,
         expenses: {},
         debtPays: {},
         savings: {},
-        note: _quickNote.text.trim().isEmpty ? 'быстрая запись' : _quickNote.text.trim(),
+        note: _quickNote.text.trim().isEmpty
+            ? 'быстрая запись'
+            : _quickNote.text.trim(),
       );
       _quickIncome.clear();
       _quickNote.clear();
@@ -128,7 +133,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       debtPays: pays,
       savings: {},
       cushIn: cushIn,
-      note: _quickNote.text.trim().isEmpty ? 'быстрая запись' : _quickNote.text.trim(),
+      note: _quickNote.text.trim().isEmpty
+          ? 'быстрая запись'
+          : _quickNote.text.trim(),
     );
     _quickExpense.clear();
     _quickNote.clear();
@@ -161,7 +168,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final income = _num(_income);
     final ci = _num(_cushIn);
     final co = _num(_cushOut);
-    if (income <= 0 && exp.isEmpty && pays.isEmpty && sav.isEmpty && ci <= 0 && co <= 0) {
+    if (income <= 0 &&
+        exp.isEmpty &&
+        pays.isEmpty &&
+        sav.isEmpty &&
+        ci <= 0 &&
+        co <= 0) {
       _toast('Введите хотя бы одну сумму');
       return;
     }
@@ -194,36 +206,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? change / bars.first.open.abs() * 100
         : 0.0;
     final activeCats = c.state.cats.where((x) => !x.archived).toList();
-    final openDebts = c.state.debts.where((x) => !x.archived).toList();
+    final openDebts = c.state.debts
+        .where(
+          (x) => !x.archived && (calc.debtRemain[x.id] ?? x.amount) > 0.004,
+        )
+        .toList();
 
     return Scaffold(
-      backgroundColor: AppTheme.bgLight,
+      backgroundColor: AppTheme.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          key: const PageStorageKey('dashboard-scroll'),
+          physics: const ClampingScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('BitBalance',
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.primary)),
-                        Text('Финансовый пульт',
-                            style: TextStyle(fontSize: 12, color: AppTheme.mutedLight)),
+                        Text(
+                          'BitBalance',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        Text(
+                          'Финансовый пульт',
+                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                        ),
                       ],
                     ),
                   ),
                   IconButton(
                     tooltip: 'Скрыть суммы',
-                    onPressed: () => c.updateSetting((s) => s.hideBal = !s.hideBal),
-                    icon: Icon(c.state.hideBal ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () =>
+                        c.updateSetting((s) => s.hideBal = !s.hideBal),
+                    icon: Icon(
+                      c.state.hideBal ? Icons.visibility_off : Icons.visibility,
+                    ),
                   ),
                   if (c.guest)
                     const Chip(
@@ -241,8 +267,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Текущий баланс',
-                          style: TextStyle(fontSize: 13, color: AppTheme.mutedLight)),
+                      Text(
+                        'Текущий баланс',
+                        style: TextStyle(fontSize: 13, color: AppTheme.muted),
+                      ),
                       const SizedBox(height: 4),
                       FittedBox(
                         fit: BoxFit.scaleDown,
@@ -252,7 +280,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w800,
-                            color: calc.balance >= 0 ? AppTheme.textLight : AppTheme.danger,
+                            color: calc.balance >= 0
+                                ? AppTheme.text
+                                : AppTheme.danger,
                           ),
                         ),
                       ),
@@ -260,10 +290,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: (change >= 0 ? AppTheme.success : AppTheme.danger)
-                                  .withValues(alpha: 0.12),
+                              color:
+                                  (change >= 0
+                                          ? AppTheme.success
+                                          : AppTheme.danger)
+                                      .withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -271,27 +307,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: change >= 0 ? AppTheme.success : AppTheme.danger,
+                                color: change >= 0
+                                    ? AppTheme.success
+                                    : AppTheme.danger,
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('за период',
-                              style: TextStyle(fontSize: 11, color: AppTheme.mutedLight)),
+                          Text(
+                            'за период',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.muted,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
                           Expanded(
-                            child: _metric('Копилка', _shown(calc.cash + calc.savingsTotal),
-                                'своб. ${_shown(calc.cash)}', AppTheme.primary),
+                            child: _metric(
+                              'Копилка',
+                              _shown(calc.cash + calc.savingsTotal),
+                              'своб. ${_shown(calc.cash)}',
+                              AppTheme.primary,
+                            ),
                           ),
                           Expanded(
-                            child: _metric('Долги', _shown(calc.debtTotal), 'активные', AppTheme.danger),
+                            child: _metric(
+                              'Долги',
+                              _shown(calc.debtTotal),
+                              'осталось вернуть',
+                              AppTheme.danger,
+                            ),
                           ),
                           Expanded(
-                            child: _metric('Подушка', _shown(calc.cushion), 'безопасность', AppTheme.success),
+                            child: _metric(
+                              'Подушка',
+                              _shown(calc.cushion),
+                              'безопасность',
+                              AppTheme.success,
+                            ),
                           ),
                         ],
                       ),
@@ -300,25 +357,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text('Подушка безопасности',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                          const Text(
+                            'Подушка безопасности',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                           const Spacer(),
                           Text(
                             '${calc.cushionPct.toStringAsFixed(0)}% · ${c.state.cushionMonths} мес.',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.mutedLight),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      ProgressLine(value: calc.cushionPct / 100, color: AppTheme.success),
+                      ProgressLine(
+                        value: calc.cushionPct / 100,
+                        color: AppTheme.success,
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         'Цель ${_shown(calc.cushionGoal)} · осталось ${_shown(calc.cushionRemaining)}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.mutedLight),
+                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
                       ),
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Остатки и рекомендации по долгам
+              SectionCard(
+                title: 'Долги · осталось вернуть',
+                subtitle: openDebts.isEmpty
+                    ? 'Активных долгов нет'
+                    : 'мин. всего ${fmtRec(debtMinSum(c.state, calc))} ₽ / день',
+                child: openDebts.isEmpty
+                    ? Text(
+                        'Долгов нет',
+                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                      )
+                    : Column(
+                        children: orderedDebts(c.state, calc, openDebts).map((
+                          d,
+                        ) {
+                          final rec = debtRec(c.state, calc, d);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        d.name,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        'остаток ${_shown(rec.remain)}'
+                                        '${rec.daysLeft != null ? ' · ${rec.daysLeft} дн.' : ''}'
+                                        '${rec.overdue ? ' · срок прошёл' : ''}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (rec.perDay != null && rec.perDay! > 0)
+                                  Text(
+                                    'рек. ${fmtRec(rec.perDay!)} ₽/день',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
               ),
               const SizedBox(height: 16),
 
@@ -328,7 +457,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 subtitle: 'Свечи, линия и скользящие средние',
                 action: TextButton(
                   onPressed: () => setState(() => _ma = !_ma),
-                  child: Text('MA', style: TextStyle(color: _ma ? AppTheme.warning : AppTheme.mutedLight)),
+                  child: Text(
+                    'MA',
+                    style: TextStyle(
+                      color: _ma ? AppTheme.warning : AppTheme.muted,
+                    ),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,22 +474,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           _pill(t, _tf == _tfKey(t), () => _setTf(_tfKey(t))),
                         _pill('Свечи', _candle, () => _setMode(true)),
                         _pill('Линия', !_candle, () => _setMode(false)),
-                        _pill('＋', false, () => setState(() => _zoom = (_zoom + .25).clamp(0.5, 2.5))),
-                        _pill('－', false, () => setState(() => _zoom = (_zoom - .25).clamp(0.5, 2.5))),
                       ],
                     ),
+                    Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
+                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     const SizedBox(height: 10),
                     if (bars.isEmpty)
-                      const SizedBox(
+                      SizedBox(
                         height: 200,
                         child: Center(
-                          child: Text('Проведите первый день — здесь появится график баланса',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppTheme.mutedLight, fontSize: 13)),
+                          child: Text(
+                            'Проведите первый день — здесь появится график баланса',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppTheme.muted,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       )
                     else
-                      BalanceChart(bars: bars, candle: _candle, ma: _ma, zoom: _zoom),
+                      BalanceChart(bars: bars, candle: _candle, ma: _ma),
                   ],
                 ),
               ),
@@ -370,9 +515,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Row(
                       children: [
-                        _pill('Сегодня', _quickOffset == 0, () => setState(() => _quickOffset = 0)),
+                        _pill(
+                          'Сегодня',
+                          _quickOffset == 0,
+                          () => setState(() => _quickOffset = 0),
+                        ),
                         const SizedBox(width: 6),
-                        _pill('Вчера', _quickOffset == -1, () => setState(() => _quickOffset = -1)),
+                        _pill(
+                          'Вчера',
+                          _quickOffset == -1,
+                          () => setState(() => _quickOffset = -1),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -382,19 +535,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: TextField(
                             controller: _quickIncome,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Доход, ₽'),
+                            decoration: const InputDecoration(
+                              labelText: 'Доход, ₽',
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _quickIncomeCat ??
-                                (c.state.incomeCats.isNotEmpty ? c.state.incomeCats.first.id : null),
-                            decoration: const InputDecoration(labelText: 'Источник'),
+                            value:
+                                _quickIncomeCat ??
+                                (c.state.incomeCats.isNotEmpty
+                                    ? c.state.incomeCats.first.id
+                                    : null),
+                            decoration: const InputDecoration(
+                              labelText: 'Источник',
+                            ),
                             items: c.state.incomeCats
-                                .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e.id,
+                                    child: Text(e.name),
+                                  ),
+                                )
                                 .toList(),
-                            onChanged: (v) => setState(() => _quickIncomeCat = v),
+                            onChanged: (v) =>
+                                setState(() => _quickIncomeCat = v),
                           ),
                         ),
                       ],
@@ -406,7 +572,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: TextField(
                             controller: _quickExpense,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Расход, ₽'),
+                            decoration: const InputDecoration(
+                              labelText: 'Расход, ₽',
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -414,13 +582,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: DropdownButtonFormField<String>(
                             value: _quickExpCat,
                             isExpanded: true,
-                            decoration: const InputDecoration(labelText: 'Куда'),
+                            decoration: const InputDecoration(
+                              labelText: 'Куда',
+                            ),
                             items: [
-                              const DropdownMenuItem(value: 'cush', child: Text('Подушка')),
-                              ...activeCats.map((e) =>
-                                  DropdownMenuItem(value: 'c:${e.id}', child: Text(e.name))),
-                              ...openDebts.map((e) =>
-                                  DropdownMenuItem(value: 'd:${e.id}', child: Text('Долг: ${e.name}'))),
+                              const DropdownMenuItem(
+                                value: 'cush',
+                                child: Text('Подушка'),
+                              ),
+                              ...activeCats.map(
+                                (e) => DropdownMenuItem(
+                                  value: 'c:${e.id}',
+                                  child: Text(e.name),
+                                ),
+                              ),
+                              ...openDebts.map(
+                                (e) => DropdownMenuItem(
+                                  value: 'd:${e.id}',
+                                  child: Text('Долг: ${e.name}'),
+                                ),
+                              ),
                             ],
                             onChanged: (v) => setState(() => _quickExpCat = v),
                           ),
@@ -430,7 +611,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _quickNote,
-                      decoration: const InputDecoration(labelText: 'Примечание', hintText: 'необязательно'),
+                      decoration: const InputDecoration(
+                        labelText: 'Примечание',
+                        hintText: 'необязательно',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -462,15 +646,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Полная запись дня',
                 subtitle: 'Доход, траты, долги, накопления и подушка',
                 action: TextButton(
-                  onPressed: () => setState(() => _formExpanded = !_formExpanded),
+                  onPressed: () =>
+                      setState(() => _formExpanded = !_formExpanded),
                   child: Text(_formExpanded ? 'Свернуть' : 'Открыть'),
                 ),
                 child: _formExpanded
                     ? _buildFullForm(activeCats, openDebts)
-                    : const Padding(
+                    : Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text('Заполните поля одним касанием — всё в одном месте.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.mutedLight)),
+                        child: Text(
+                          'Заполните поля одним касанием — всё в одном месте.',
+                          style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                        ),
                       ),
               ),
             ],
@@ -490,9 +677,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: _pill(
-                  d == 0 ? 'Сегодня' : d == -1 ? 'Вчера' : d == -2 ? 'Позавчера' : 'Завтра',
+                  d == 0
+                      ? 'Сегодня'
+                      : d == -1
+                      ? 'Вчера'
+                      : d == -2
+                      ? 'Позавчера'
+                      : 'Завтра',
                   _daysBetween(_entryDate, DateTime.now()) == d,
-                  () => setState(() => _entryDate = DateTime.now().add(Duration(days: d))),
+                  () => setState(
+                    () => _entryDate = DateTime.now().add(Duration(days: d)),
+                  ),
                 ),
               ),
           ],
@@ -529,23 +724,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }),
         if (debts.isNotEmpty) ...[
           const SizedBox(height: 8),
-          const Text('Погашение долгов', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text(
+            'Погашение долгов',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'мин. всего ${fmtRec(debtMinSum(c.state, c.calc))} ₽ / день · '
+            'рек. платёж = остаток ÷ дни до срока',
+            style: TextStyle(fontSize: 11, color: AppTheme.muted),
+          ),
           const SizedBox(height: 8),
           ...debts.map((d) {
             _debts.putIfAbsent(d.id, () => TextEditingController());
+            final rec = debtRec(c.state, c.calc, d);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: _debts[d.id],
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: d.name),
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _debts[d.id],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: '${d.name} · остаток ${_shown(rec.remain)}',
+                      ),
+                    ),
+                  ),
+                  if (rec.perDay != null && rec.perDay! > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 6),
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => setState(
+                          () => _debts[d.id]!.text = fmtRec(rec.perDay!),
+                        ),
+                        child: Text(
+                          'рек. ${fmtRec(rec.perDay!)}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             );
           }),
         ],
         if (c.state.savings.isNotEmpty) ...[
           const SizedBox(height: 8),
-          const Text('Накопления и инвестиции', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text(
+            'Накопления и инвестиции',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 8),
           ...c.state.savings.where((g) => !g.archived).map((g) {
             _savings.putIfAbsent(g.id, () => TextEditingController());
@@ -589,43 +827,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,
-          child: FilledButton(onPressed: _submitFull, child: const Text('Провести день')),
+          child: FilledButton(
+            onPressed: _submitFull,
+            child: const Text('Провести день'),
+          ),
         ),
       ],
     );
   }
 
-  int _daysBetween(DateTime a, DateTime b) =>
-      DateTime(a.year, a.month, a.day).difference(DateTime(b.year, b.month, b.day)).inDays;
+  int _daysBetween(DateTime a, DateTime b) => DateTime(
+    a.year,
+    a.month,
+    a.day,
+  ).difference(DateTime(b.year, b.month, b.day)).inDays;
 
-  String _tfKey(String label) => const {
+  String _tfKey(String label) =>
+      const {
         'День': 'day',
         'Нед': 'week',
         'Мес': 'month',
         'Год': 'year',
-      }[label] ?? 'day';
+      }[label] ??
+      'day';
 
   Widget _metric(String label, String value, String sub, Color color) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, color: AppTheme.mutedLight)),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: AppTheme.muted),
+        ),
         const SizedBox(height: 2),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
         ),
         Text(
           sub,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 10, color: AppTheme.mutedLight),
+          style: TextStyle(fontSize: 10, color: AppTheme.muted),
         ),
       ],
     );
@@ -637,16 +889,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppTheme.primary : AppTheme.bgLight,
+          color: active ? AppTheme.primary : AppTheme.bg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: active ? AppTheme.primary : AppTheme.borderLight),
+          border: Border.all(
+            color: active ? AppTheme.primary : AppTheme.border,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: active ? Colors.white : AppTheme.mutedLight,
+            color: active ? Colors.white : AppTheme.muted,
           ),
         ),
       ),

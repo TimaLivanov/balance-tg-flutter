@@ -10,7 +10,8 @@ class ApiService {
   final String baseUrl;
   final http.Client _client = createHttpClient();
 
-  Future<http.Response> get(String path) => _client.get(Uri.parse('$baseUrl$path'));
+  Future<http.Response> get(String path) =>
+      _client.get(Uri.parse('$baseUrl$path'));
 
   Future<http.Response> post(String path, [Map<String, dynamic>? body]) {
     return _client.post(

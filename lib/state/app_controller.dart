@@ -13,9 +13,9 @@ import '../services/telegram_service.dart';
 /// Контроллер приложения — аналог глобального state + recalc() + синхронизации из HTML.
 class AppController extends ChangeNotifier {
   AppController()
-      : _api = ApiService(),
-        _auth = AuthService(ApiService()),
-        _stateService = StateService(ApiService());
+    : _api = ApiService(),
+      _auth = AuthService(ApiService()),
+      _stateService = StateService(ApiService());
 
   final ApiService _api;
   final AuthService _auth;
@@ -144,15 +144,20 @@ class AppController extends ChangeNotifier {
     final info = readTelegramInfo();
     if (info == null) return 'Откройте приложение через бота Telegram';
     try {
-      final res = await _api.post('/api/telegram/link', {'initData': info.initData});
+      final res = await _api.post('/api/telegram/link', {
+        'initData': info.initData,
+      });
       final body = _json(res.body);
-      if (res.statusCode >= 200 && res.statusCode < 300 && body['error'] == null) {
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          body['error'] == null) {
         _telegramLinked = true;
         _telegramError = null;
         notifyListeners();
         return null;
       }
-      _telegramError = body['error']?.toString() ?? 'Не удалось привязать Telegram';
+      _telegramError =
+          body['error']?.toString() ?? 'Не удалось привязать Telegram';
       notifyListeners();
       return _telegramError;
     } catch (e) {
@@ -168,10 +173,33 @@ class AppController extends ChangeNotifier {
     try {
       final res = await _api.post('/api/telegram/test');
       final body = _json(res.body);
-      if (res.statusCode >= 200 && res.statusCode < 300 && body['error'] == null) {
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          body['error'] == null) {
         return null;
       }
       return body['error']?.toString() ?? 'Не удалось отправить сообщение';
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Диагностика уведомлений: время, тихий режим и тестовое сообщение.
+  Future<String> debugNotify() async {
+    if (!_authenticated) return 'Сначала войдите в аккаунт';
+    try {
+      final res = await _api.post('/api/notify/debug');
+      final body = _json(res.body);
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          body['error'] == null) {
+        final times = (body['userTimes'] as List?)?.join(', ') ?? '';
+        return 'UTC ${body['utcHour']}:00 · локально ${body['localHour']}:00 · '
+            'времена: $times · совпадение: ${body['timeMatch'] == true ? 'да' : 'нет'} · '
+            'тихий: ${body['quiet'] == true ? 'да' : 'нет'} · '
+            'отправлено: ${body['sent'] == true ? 'да' : 'нет'}${body['sendError'] != null ? ' (${body['sendError']})' : ''}';
+      }
+      return body['error']?.toString() ?? 'Не удалось выполнить диагностику';
     } catch (e) {
       return e.toString();
     }
@@ -229,7 +257,9 @@ class AppController extends ChangeNotifier {
     final raw = _prefs?.getString('balance-tg-state-v1');
     if (raw == null || raw.isEmpty) return AppState.empty();
     try {
-      return AppState.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      return AppState.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
     } catch (_) {
       return AppState.empty();
     }
@@ -237,19 +267,35 @@ class AppController extends ChangeNotifier {
 
   // ---- CRUD-операции (аналог функций из HTML) ----
 
-  void addCategory(String name, {required bool need, required bool rare, double plan = 0, String planDate = ''}) {
+  void addCategory(
+    String name, {
+    required bool need,
+    required bool rare,
+    double plan = 0,
+    String planDate = '',
+  }) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    _state.cats.add(Category(
-      id: id,
-      name: name.trim().isEmpty ? 'Категория' : name.trim(),
-      need: need,
-      rare: rare,
-      plan: plan > 0 ? Plan(amount: plan, date: planDate) : null,
-    ));
+    _state.cats.add(
+      Category(
+        id: id,
+        name: name.trim().isEmpty ? 'Категория' : name.trim(),
+        need: need,
+        rare: rare,
+        plan: plan > 0 ? Plan(amount: plan, date: planDate) : null,
+      ),
+    );
     commit();
   }
 
-  void updateCategory(String id, {String? name, bool? need, bool? rare, bool? archived, double? plan, String? planDate}) {
+  void updateCategory(
+    String id, {
+    String? name,
+    bool? need,
+    bool? rare,
+    bool? archived,
+    double? plan,
+    String? planDate,
+  }) {
     final idx = _state.cats.indexWhere((c) => c.id == id);
     if (idx < 0) return;
     final c = _state.cats[idx];
@@ -273,18 +319,53 @@ class AppController extends ChangeNotifier {
     commit();
   }
 
-  void addDebt(String name, double amount, {String due = '', double rate = 0}) {
-    _state.debts.add(Debt(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim().isEmpty ? 'Долг' : name.trim(),
-      amount: amount,
-      due: due,
-      rate: rate,
-    ));
+  void addDebt(
+    String name,
+    double amount, {
+    String due = '',
+    double rate = 0,
+    String date = '',
+    bool creditCash = true,
+  }) {
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final day = date.isEmpty ? _dateKey(DateTime.now()) : date;
+    _state.debts.add(
+      Debt(
+        id: id,
+        name: name.trim().isEmpty ? 'Долг' : name.trim(),
+        amount: amount,
+        due: due,
+        date: day,
+        rate: rate,
+      ),
+    );
+    _state.history.add(
+      Entry(
+        id: '${id}d',
+        type: 'debt',
+        date: day,
+        income: 0,
+        expenses: {},
+        debtPays: {},
+        savings: {},
+        savSpend: {},
+        debtId: id,
+        debtAmt: amount,
+        creditCash: creditCash,
+        autoItems: [],
+        autoMk: [],
+      ),
+    );
     commit();
   }
 
-  void updateDebt(String id, {String? name, double? amount, String? due, bool? archived}) {
+  void updateDebt(
+    String id, {
+    String? name,
+    double? amount,
+    String? due,
+    bool? archived,
+  }) {
     final idx = _state.debts.indexWhere((d) => d.id == id);
     if (idx < 0) return;
     final d = _state.debts[idx];
@@ -307,13 +388,20 @@ class AppController extends ChangeNotifier {
     commit();
   }
 
-  void addSavings(String name, double target, {String kind = 'goal', String date = ''}) {
-    _state.savings.add(SavingsGoal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim().isEmpty ? 'Накопление' : name.trim(),
-      kind: kind,
-      plan: target > 0 ? Plan(amount: target, date: date) : null,
-    ));
+  void addSavings(
+    String name,
+    double target, {
+    String kind = 'goal',
+    String date = '',
+  }) {
+    _state.savings.add(
+      SavingsGoal(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name.trim().isEmpty ? 'Накопление' : name.trim(),
+        kind: kind,
+        plan: target > 0 ? Plan(amount: target, date: date) : null,
+      ),
+    );
     commit();
   }
 
@@ -322,14 +410,21 @@ class AppController extends ChangeNotifier {
     commit();
   }
 
-  void addAutoPay(String name, double amount, {String mode = 'daily', int day = 1}) {
-    _state.autopay.add(AutoPay(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim().isEmpty ? 'Автоплатёж' : name.trim(),
-      amount: amount,
-      mode: mode,
-      day: day,
-    ));
+  void addAutoPay(
+    String name,
+    double amount, {
+    String mode = 'daily',
+    int day = 1,
+  }) {
+    _state.autopay.add(
+      AutoPay(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name.trim().isEmpty ? 'Автоплатёж' : name.trim(),
+        amount: amount,
+        mode: mode,
+        day: day,
+      ),
+    );
     commit();
   }
 
@@ -407,7 +502,12 @@ class AppController extends ChangeNotifier {
     for (final e in _state.history) {
       if (e.type != 'day') continue;
       e.expenses.forEach((k, v) {
-        final name = _state.cats.where((x) => x.id == k).map((x) => x.name).firstOrNull ?? k;
+        final name =
+            _state.cats
+                .where((x) => x.id == k)
+                .map((x) => x.name)
+                .firstOrNull ??
+            k;
         final idx = topExp.indexWhere((x) => x.key == name);
         if (idx >= 0) {
           topExp[idx] = MapEntry(name, topExp[idx].value + v);
@@ -417,11 +517,20 @@ class AppController extends ChangeNotifier {
       });
     }
     topExp.sort((a, b) => b.value.compareTo(a.value));
-    final exp = topExp.take(8).map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}').join(', ');
+    final exp = topExp
+        .take(8)
+        .map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}')
+        .join(', ');
     final debts = _state.debts
-        .where((d) => !d.archived)
+        .where((d) => !d.archived && (c.debtRemain[d.id] ?? d.amount) > 0)
         .take(12)
-        .map((d) => '${d.name}: ${d.amount.toStringAsFixed(0)}')
+        .map((d) {
+          final remain = c.debtRemain[d.id] ?? d.amount;
+          final overdue =
+              d.due.isNotEmpty && d.due.compareTo(_dateKey(DateTime.now())) < 0;
+          return '${d.name}: осталось ${remain.toStringAsFixed(0)}'
+              '${d.due.isNotEmpty ? ', срок ${d.due}${overdue ? ' (просрочен)' : ''}' : ''}';
+        })
         .join(', ');
     return 'Баланс: ${c.balance.toStringAsFixed(0)}\n'
         'Наличные: ${c.cash.toStringAsFixed(0)}\n'
@@ -479,10 +588,12 @@ class AppController extends ChangeNotifier {
       if (raw is! List) return [];
       return raw
           .whereType<Map>()
-          .map((e) => {
-                'role': (e['role'] ?? 'user').toString(),
-                'content': (e['content'] ?? e['message'] ?? '').toString(),
-              })
+          .map(
+            (e) => {
+              'role': (e['role'] ?? 'user').toString(),
+              'content': (e['content'] ?? e['message'] ?? '').toString(),
+            },
+          )
           .toList();
     } catch (_) {
       return [];
@@ -491,6 +602,26 @@ class AppController extends ChangeNotifier {
 
   void _recalc() {
     _calc = recalc(_state);
+    // Как в HTML: полностью погашенные долги уходят в архив.
+    var changed = false;
+    for (var i = 0; i < _state.debts.length; i++) {
+      final d = _state.debts[i];
+      if (d.archived) continue;
+      final rem = _calc.debtRemain[d.id] ?? d.amount;
+      if (rem > 0.004) continue;
+      _state.debts[i] = Debt(
+        id: d.id,
+        name: d.name,
+        amount: d.amount,
+        due: d.due,
+        date: d.date,
+        rate: d.rate,
+        archived: true,
+        archivedAt: _dateKey(DateTime.now()),
+      );
+      changed = true;
+    }
+    if (changed) _calc = recalc(_state);
   }
 
   @override
@@ -515,6 +646,12 @@ class CalcResult {
   final double cushion;
   final double savingsTotal;
   final double debtTotal;
+
+  /// Остаток по каждому долгу (аналог R.debtRemain из HTML).
+  final Map<String, double> debtRemain;
+
+  /// Всего погашено за всё время.
+  final double debtPaid;
   final double balance;
   final double income;
   final double expenses;
@@ -529,6 +666,8 @@ class CalcResult {
     required this.cushion,
     required this.savingsTotal,
     required this.debtTotal,
+    this.debtRemain = const {},
+    this.debtPaid = 0,
     required this.balance,
     required this.income,
     required this.expenses,
@@ -540,19 +679,21 @@ class CalcResult {
   });
 
   factory CalcResult.empty() => CalcResult(
-        cash: 0,
-        cushion: 0,
-        savingsTotal: 0,
-        debtTotal: 0,
-        balance: 0,
-        income: 0,
-        expenses: 0,
-        cushionGoal: 0,
-        cushionPct: 0,
-        cushionRecPerDay: 0,
-        cushionRemaining: 0,
-        points: [],
-      );
+    cash: 0,
+    cushion: 0,
+    savingsTotal: 0,
+    debtTotal: 0,
+    debtRemain: const {},
+    debtPaid: 0,
+    balance: 0,
+    income: 0,
+    expenses: 0,
+    cushionGoal: 0,
+    cushionPct: 0,
+    cushionRecPerDay: 0,
+    cushionRemaining: 0,
+    points: [],
+  );
 }
 
 class DailyPoint {
@@ -572,27 +713,112 @@ class DailyPoint {
   });
 }
 
-CalcResult recalc(AppState s) {
-  final entries = List<Entry>.from(s.history)..sort((a, b) {
-    if (a.date == b.date) return a.id.compareTo(b.id);
-    return a.date.compareTo(b.date);
+/// Рекомендация по долгу (аналог debtRec() из HTML).
+class DebtRec {
+  final double remain;
+
+  /// Рекомендуемый платёж в день. null — у долга нет срока.
+  final double? perDay;
+  final int? daysLeft;
+  final bool overdue;
+
+  DebtRec({
+    required this.remain,
+    required this.perDay,
+    required this.daysLeft,
+    this.overdue = false,
   });
+}
+
+DebtRec debtRec(AppState s, CalcResult calc, Debt d) {
+  final remain = calc.debtRemain[d.id] ?? d.amount;
+  if (remain <= 0.004) {
+    return DebtRec(remain: 0, perDay: 0, daysLeft: 0);
+  }
+  if (d.due.isEmpty) {
+    return DebtRec(remain: remain, perDay: null, daysLeft: null);
+  }
+  final due = DateTime.tryParse(d.due);
+  if (due == null) {
+    return DebtRec(remain: remain, perDay: null, daysLeft: null);
+  }
+  final now = DateTime.now();
+  final raw = _dayDiff(now, due) + 1;
+  final daysLeft = raw < 1 ? 1 : raw;
+  return DebtRec(
+    remain: remain,
+    perDay: remain / daysLeft,
+    daysLeft: daysLeft,
+    overdue: due.isBefore(DateTime(now.year, now.month, now.day)),
+  );
+}
+
+/// Долги в порядке стратегий snow / aval / order (как в HTML).
+List<Debt> orderedDebts(AppState s, CalcResult calc, List<Debt> source) {
+  final list = List<Debt>.from(source);
+  if (s.strategy == 'snow') {
+    list.sort(
+      (a, b) => (calc.debtRemain[a.id] ?? a.amount).compareTo(
+        calc.debtRemain[b.id] ?? b.amount,
+      ),
+    );
+  } else if (s.strategy == 'aval') {
+    list.sort(
+      (a, b) => (calc.debtRemain[b.id] ?? b.amount).compareTo(
+        calc.debtRemain[a.id] ?? a.amount,
+      ),
+    );
+  }
+  return list;
+}
+
+/// Сумма рекомендуемых платежей по всем открытым долгам.
+double debtMinSum(AppState s, CalcResult calc) {
+  var total = 0.0;
+  for (final d in s.debts) {
+    if (d.archived) continue;
+    final rec = debtRec(s, calc, d);
+    if (rec.perDay != null) total += rec.perDay!;
+  }
+  return total;
+}
+
+CalcResult recalc(AppState s) {
+  final entries = List<Entry>.from(s.history)
+    ..sort((a, b) {
+      if (a.date == b.date) return a.id.compareTo(b.id);
+      return a.date.compareTo(b.date);
+    });
 
   double cash = s.startCash;
   double cushion = s.startCushion;
   double savings = 0;
-  double debts = 0;
   double income = 0;
   double expenses = 0;
 
-  // Активные долги (без события создания в истории) учитываются с начала.
+  // Остаток по каждому долгу (аналог bal/debtRemain из HTML recalc()).
   final debtEventIds = entries
       .where((e) => e.type == 'debt' && e.debtId != null)
       .map((e) => e.debtId.toString())
       .toSet();
-  for (final d in s.debts) {
-    if (!d.archived && !debtEventIds.contains(d.id)) debts += d.amount;
+  final debtBal = <String, double>{for (final d in s.debts) d.id: d.amount};
+  final debtActive = <String>{
+    for (final d in s.debts)
+      if (!debtEventIds.contains(d.id)) d.id,
+  };
+  double debtPaid = 0;
+
+  double debtSum() {
+    var total = 0.0;
+    for (final d in s.debts) {
+      if (d.archived || !debtActive.contains(d.id)) continue;
+      final v = debtBal[d.id] ?? 0;
+      if (v > 0) total += v;
+    }
+    return total;
   }
+
+  var debts = debtSum();
 
   final points = <DailyPoint>[];
   var prevBal = s.startCash + s.startCushion - debts;
@@ -611,12 +837,12 @@ CalcResult recalc(AppState s) {
     if (e.type == 'debt') {
       final d = s.debts.where((x) => x.id == e.debtId).firstOrNull;
       if (d != null) {
-        final amt = e.debtAmt > 0 ? e.debtAmt : d.amount;
-        if (e.creditCash) {
-          cash += amt;
-        } else {
-          debts += amt;
-        }
+        final amt = debtBal[d.id] ?? (e.debtAmt > 0 ? e.debtAmt : d.amount);
+        debtBal[d.id] = amt;
+        debtActive.add(d.id);
+        // Галочка «деньги уже получил» добавляет копилку, но долг остаётся.
+        if (e.creditCash) cash += amt;
+        debts = debtSum();
         touch();
       }
     } else {
@@ -638,11 +864,16 @@ CalcResult recalc(AppState s) {
         cash += v;
         touch();
       }
-      for (final v in e.debtPays.values) {
-        debts -= v;
-        cash -= v;
+      e.debtPays.forEach((id, v) {
+        final available = debtBal[id] ?? 0;
+        final pay = v < available ? v : available;
+        if (pay <= 0) return;
+        debtBal[id] = available - pay;
+        debtPaid += pay;
+        cash -= pay;
+        debts = debtSum();
         touch();
-      }
+      });
       cushion += e.cushIn;
       cushion -= e.cushOut;
       if (e.cushOut > 0) {
@@ -651,14 +882,16 @@ CalcResult recalc(AppState s) {
       touch();
     }
     final close = cash + cushion + savings - debts;
-    points.add(DailyPoint(
-      date: e.date,
-      balance: close,
-      open: open,
-      high: high,
-      low: low,
-      close: close,
-    ));
+    points.add(
+      DailyPoint(
+        date: e.date,
+        balance: close,
+        open: open,
+        high: high,
+        low: low,
+        close: close,
+      ),
+    );
     prevBal = close;
   }
 
@@ -676,6 +909,11 @@ CalcResult recalc(AppState s) {
     cushion: cushion,
     savingsTotal: savings,
     debtTotal: debts,
+    debtRemain: {
+      for (final d in s.debts)
+        d.id: (debtBal[d.id] ?? 0) > 0 ? debtBal[d.id]! : 0.0,
+    },
+    debtPaid: debtPaid,
     balance: balance,
     income: income,
     expenses: expenses,
@@ -720,8 +958,8 @@ double _monthlyBase(AppState s, List<Entry> entries) {
     }
     final span = daysWith.isEmpty
         ? s.windowDays < dayEntries.length
-            ? s.windowDays
-            : (dayEntries.isEmpty ? 1 : dayEntries.length)
+              ? s.windowDays
+              : (dayEntries.isEmpty ? 1 : dayEntries.length)
         : daysWith.length;
     final avgDay = spentWin / span;
     final base = cat.spentBase > allTime ? allTime : cat.spentBase;
@@ -730,11 +968,15 @@ double _monthlyBase(AppState s, List<Entry> entries) {
     double? minDay;
     final plan = cat.plan;
     if (plan != null && plan.amount > 0) {
-      final remaining = plan.amount - totalSpent > 0 ? plan.amount - totalSpent : 0.0;
+      final remaining = plan.amount - totalSpent > 0
+          ? plan.amount - totalSpent
+          : 0.0;
       if (remaining > 0 && plan.date.isNotEmpty) {
         final due = DateTime.tryParse(plan.date);
         if (due != null) {
-          final daysLeft = _dayDiff(today, due) + 1 < 1 ? 1 : _dayDiff(today, due) + 1;
+          final daysLeft = _dayDiff(today, due) + 1 < 1
+              ? 1
+              : _dayDiff(today, due) + 1;
           minDay = remaining / daysLeft;
         }
       }
@@ -762,5 +1004,9 @@ double _monthlyBase(AppState s, List<Entry> entries) {
 String _dateKey(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-int _dayDiff(DateTime a, DateTime b) =>
-    DateTime(a.year, a.month, a.day).difference(DateTime(b.year, b.month, b.day)).inDays;
+/// Как JS dayDiff(a, b): сколько дней от a до b (положительно, если b в будущем).
+int _dayDiff(DateTime a, DateTime b) => DateTime(
+  b.year,
+  b.month,
+  b.day,
+).difference(DateTime(a.year, a.month, a.day)).inDays;

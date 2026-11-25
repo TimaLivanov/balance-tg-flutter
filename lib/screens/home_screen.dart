@@ -19,14 +19,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  List<Widget> get _screens => [
-        DashboardScreen(controller: widget.controller),
-        MoneyScreen(controller: widget.controller),
-        AnalyticsScreen(controller: widget.controller),
-        HistoryScreen(controller: widget.controller),
-        ReportScreen(controller: widget.controller),
-        SettingsScreen(controller: widget.controller),
-      ];
+  /// Экраны создаются один раз: при каждом notifyListeners() не нужно
+  /// пересоздавать дерево и сбрасывать позицию прокрутки.
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    final controller = widget.controller;
+    _screens = [
+      DashboardScreen(controller: controller),
+      MoneyScreen(controller: controller),
+      AnalyticsScreen(controller: controller),
+      HistoryScreen(controller: controller),
+      ReportScreen(controller: controller),
+      SettingsScreen(controller: controller),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

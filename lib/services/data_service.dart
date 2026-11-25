@@ -17,7 +17,9 @@ class DataService {
       return UserData.fromJson(dataJson);
     }
     if (res.statusCode == 404) {
-      throw Exception('404: Эндпоинт /api/data не найден. Проверьте URL worker и деплой.');
+      throw Exception(
+        '404: Эндпоинт /api/data не найден. Проверьте URL worker и деплой.',
+      );
     }
     if (res.statusCode == 401) {
       throw Exception('401: Не авторизован. Войдите снова.');

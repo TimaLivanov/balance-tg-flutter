@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgLight,
+      backgroundColor: AppTheme.bg,
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24),
               child: Card(
                 elevation: 0,
-                color: AppTheme.cardLight,
+                color: AppTheme.card,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
@@ -66,10 +66,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.account_balance_wallet_rounded,
-                          size: 56, color: AppTheme.primary),
+                      Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 56,
+                        color: AppTheme.primary,
+                      ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'BitBalance',
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -79,21 +82,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         'Личный финансовый помощник',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: AppTheme.mutedLight),
+                        style: TextStyle(fontSize: 13, color: AppTheme.muted),
                       ),
                       const SizedBox(height: 20),
                       Row(
                         children: [
-                          Expanded(
-                            child: _authTab('Вход', !_register),
-                          ),
+                          Expanded(child: _authTab('Вход', !_register)),
                           const SizedBox(width: 8),
-                          Expanded(
-                            child: _authTab('Регистрация', _register),
-                          ),
+                          Expanded(child: _authTab('Регистрация', _register)),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -124,7 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 12),
                         Text(
                           _error!,
-                          style: const TextStyle(color: AppTheme.danger, fontSize: 13),
+                          style: const TextStyle(
+                            color: AppTheme.danger,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 20),
@@ -148,11 +150,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: const Text('Продолжить как гость'),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Гость: данные хранятся только в этом браузере.\n'
                         'Аккаунт: данные синхронизируются с сервером.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, color: AppTheme.mutedLight),
+                        style: TextStyle(fontSize: 11, color: AppTheme.muted),
                       ),
                     ],
                   ),
@@ -174,14 +176,14 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: active ? AppTheme.primary : AppTheme.bgLight,
+          color: active ? AppTheme.primary : AppTheme.bg,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: active ? Colors.white : AppTheme.mutedLight,
+            color: active ? Colors.white : AppTheme.muted,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),

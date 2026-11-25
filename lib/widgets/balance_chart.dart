@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../state/app_controller.dart';
@@ -42,28 +43,36 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
   final window = tf == 'day'
       ? 14
       : tf == 'week'
-          ? 7
-          : tf == 'month'
-              ? 30
-              : 365;
+      ? 7
+      : tf == 'month'
+      ? 30
+      : 365;
   final now = DateTime.now();
   final endKey = _key(now);
   final dates = byDate.keys.toList()..sort();
   final first = DateTime.parse(dates.first);
-  var from = DateTime(now.year, now.month, now.day).subtract(Duration(days: window - 1));
+  var from = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: window - 1));
   if (from.isBefore(first)) from = first;
 
   final daily = <Bar>[];
   double? prevClose;
-  for (var d = DateTime(from.year, from.month, from.day);
-      _key(d).compareTo(endKey) <= 0;
-      d = d.add(const Duration(days: 1))) {
+  for (
+    var d = DateTime(from.year, from.month, from.day);
+    _key(d).compareTo(endKey) <= 0;
+    d = d.add(const Duration(days: 1))
+  ) {
     final key = _key(d);
     final list = byDate[key];
     if (list == null || list.isEmpty) {
       // Дни без записей — плоские бары на уровне предыдущего закрытия.
       if (prevClose != null) {
-        daily.add(_bar(key, prevClose, prevClose, prevClose, prevClose, true, 0));
+        daily.add(
+          _bar(key, prevClose, prevClose, prevClose, prevClose, true, 0),
+        );
       }
       continue;
     }
@@ -113,7 +122,15 @@ List<Bar> buildBars(List<DailyPoint> points, String tf) {
   return order.map((k) => weeks[k]!).toList();
 }
 
-Bar _bar(String date, double o, double h, double l, double c, bool empty, int volume) {
+Bar _bar(
+  String date,
+  double o,
+  double h,
+  double l,
+  double c,
+  bool empty,
+  int volume,
+) {
   return Bar(
     date: date,
     label: date.substring(5, 7) == '01' || date.substring(8, 10) == '01'
@@ -157,37 +174,178 @@ class BalanceChart extends StatefulWidget {
 }
 
 class _BalanceChartState extends State<BalanceChart> {
-  Offset? _cursor;
+  /// Как в Binance: окно свечей и сдвиг по истории живут внутри графика.
+  late int _barCount;
+  double _rightOffset = 0;
+
+  final ValueNotifier<Offset?> _cursor = ValueNotifier(null);
+  final Map<int, Offset> _pointers = {};
+
+  Offset? _panStart;
+  double _startOffset = 0;
+  double _startCell = 1;
+
+  double? _pinchDistance;
+  double? _pinchStartCount;
+  double? _pinchStartOffset;
+  Offset? _pinchCenter;
+
+  @override
+  void initState() {
+    super.initState();
+    _barCount = (60 / widget.zoom).round().clamp(8, 120);
+  }
+
+  @override
+  void dispose() {
+    _cursor.dispose();
+    super.dispose();
+  }
+
+  int get _visibleCount =>
+      widget.bars.isEmpty ? 1 : _barCount.clamp(1, widget.bars.length);
+
+  int get _maxOffset => widget.bars.length - _visibleCount < 0
+      ? 0
+      : widget.bars.length - _visibleCount;
+
+  double _cellFor(double width) {
+    final plotW = width - _BalanceChartPainter.padL - _BalanceChartPainter.padR;
+    return plotW > 0 ? plotW / _visibleCount : 1;
+  }
+
+  (int, int) _window() {
+    final end = widget.bars.length - _rightOffset.round().clamp(0, _maxOffset);
+    final start = math.max(0, end - _visibleCount);
+    return (start, end);
+  }
+
+  void _reset() {
+    setState(() {
+      _barCount = (60 / widget.zoom).round().clamp(8, 120);
+      _rightOffset = 0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final visibleCount = (60 / widget.zoom).round().clamp(8, 120);
-    final show = widget.bars.length > visibleCount
-        ? widget.bars.sublist(widget.bars.length - visibleCount)
-        : widget.bars;
+    final (start, end) = _window();
+    final show = widget.bars.sublist(start, end);
 
     return SizedBox(
       height: widget.height,
-      child: Listener(
-        onPointerDown: (e) => setState(() => _cursor = e.localPosition),
-        onPointerMove: (e) => setState(() => _cursor = e.localPosition),
-        onPointerUp: (_) => setState(() => _cursor = null),
-        onPointerCancel: (_) => setState(() => _cursor = null),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return CustomPaint(
-              size: Size(constraints.maxWidth, widget.height),
-              painter: _BalanceChartPainter(
-                bars: show,
-                candle: widget.candle,
-                ma: widget.ma,
-                cursor: _cursor,
-              ),
-            );
+      child: MouseRegion(
+        onExit: (_) {
+          if (_pointers.isEmpty) _cursor.value = null;
+        },
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (e) {
+            _pointers[e.pointer] = e.localPosition;
+            _cursor.value = e.localPosition;
+            if (_pointers.length == 1) {
+              _panStart = e.localPosition;
+              _startOffset = _rightOffset;
+              _startCell = _cellFor(
+                (context.findRenderObject() as RenderBox?)?.size.width ?? 320,
+              );
+            } else if (_pointers.length == 2) {
+              final p = _pointers.values.toList();
+              _pinchDistance = (p[0] - p[1]).distance;
+              _pinchCenter = (p[0] + p[1]) / 2;
+              _pinchStartCount = _barCount.toDouble();
+              _pinchStartOffset = _rightOffset;
+            }
           },
+          onPointerMove: (e) {
+            if (!_pointers.containsKey(e.pointer)) return;
+            _pointers[e.pointer] = e.localPosition;
+            _cursor.value = e.localPosition;
+            final width =
+                (context.findRenderObject() as RenderBox?)?.size.width ?? 320;
+            if (_pointers.length >= 2 &&
+                _pinchDistance != null &&
+                _pinchDistance! > 1) {
+              final p = _pointers.values.take(2).toList();
+              final dist = (p[0] - p[1]).distance;
+              final center = (p[0] + p[1]) / 2;
+              final count = (_pinchStartCount! * _pinchDistance! / dist)
+                  .round()
+                  .clamp(8, 120);
+              final cell = _cellFor(width);
+              setState(() {
+                _barCount = count;
+                _rightOffset =
+                    (_pinchStartOffset! + (center.dx - _pinchCenter!.dx) / cell)
+                        .clamp(0, math.max(0, widget.bars.length - count))
+                        .toDouble();
+              });
+            } else if (_pointers.length == 1 && _panStart != null) {
+              setState(() {
+                _rightOffset =
+                    (_startOffset +
+                            (e.localPosition.dx - _panStart!.dx) / _startCell)
+                        .clamp(0, _maxOffset)
+                        .toDouble();
+              });
+            }
+          },
+          onPointerUp: (e) => _endPointer(e.pointer),
+          onPointerCancel: (e) => _endPointer(e.pointer),
+          onPointerHover: (e) => _cursor.value = e.localPosition,
+          onPointerSignal: (e) {
+            if (e is PointerScrollEvent) {
+              setState(() {
+                _barCount = (_barCount + (e.scrollDelta.dy > 0 ? 2 : -2)).clamp(
+                  8,
+                  120,
+                );
+                _rightOffset = _rightOffset.clamp(0, _maxOffset).toDouble();
+              });
+            }
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onDoubleTap: _reset,
+            child: ValueListenableBuilder<Offset?>(
+              valueListenable: _cursor,
+              builder: (context, cursor, _) {
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    return CustomPaint(
+                      size: Size(constraints.maxWidth, widget.height),
+                      painter: _BalanceChartPainter(
+                        bars: show,
+                        candle: widget.candle,
+                        ma: widget.ma,
+                        cursor: cursor,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  void _endPointer(int pointer) {
+    _pointers.remove(pointer);
+    if (_pointers.length < 2) {
+      _pinchDistance = null;
+      _pinchStartCount = null;
+      _pinchStartOffset = null;
+      _pinchCenter = null;
+    }
+    if (_pointers.isEmpty) {
+      _panStart = null;
+      _cursor.value = null;
+    } else {
+      _panStart = _pointers.values.first;
+      _startOffset = _rightOffset;
+    }
   }
 }
 
@@ -281,28 +439,37 @@ class _BalanceChartPainter extends CustomPainter {
     final pos = cursor;
     if (pos == null) return null;
     final x = pos.dx - padL;
-    if (x < 0 || x > plotW || pos.dy < padT || pos.dy > padT + plotH) return null;
+    if (x < 0 || x > plotW || pos.dy < padT || pos.dy > padT + plotH)
+      return null;
     return (x / cell).floor().clamp(0, bars.length - 1);
   }
 
   void _drawZones(Canvas canvas, Size size) {
-    final green = Paint()..color = const Color(0xFF0ECB81).withValues(alpha: 0.045);
-    final red = Paint()..color = const Color(0xFFF6465D).withValues(alpha: 0.055);
-    canvas.drawRect(Rect.fromLTWH(padL, padT, plotW, math.max(0, y0 - padT)), green);
-    canvas.drawRect(Rect.fromLTWH(padL, y0, plotW, math.max(0, padT + plotH - y0)), red);
+    final green = Paint()
+      ..color = const Color(0xFF0ECB81).withValues(alpha: 0.045);
+    final red = Paint()
+      ..color = const Color(0xFFF6465D).withValues(alpha: 0.055);
+    canvas.drawRect(
+      Rect.fromLTWH(padL, padT, plotW, math.max(0, y0 - padT)),
+      green,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(padL, y0, plotW, math.max(0, padT + plotH - y0)),
+      red,
+    );
   }
 
   void _drawGrid(Canvas canvas, Size size) {
     final grid = Paint()
-      ..color = AppTheme.borderLight.withValues(alpha: 0.55)
+      ..color = AppTheme.border.withValues(alpha: 0.55)
       ..strokeWidth = 1;
 
     // Вертикальная сетка и подписи времени.
     final labelEvery = bars.length > 20
         ? (bars.length / 7).ceil()
         : bars.length > 12
-            ? 2
-            : 1;
+        ? 2
+        : 1;
     for (var i = 0; i < bars.length; i++) {
       final x = padL + (i + 0.5) * cell;
       canvas.drawLine(Offset(x, padT), Offset(x, padT + plotH), grid);
@@ -311,7 +478,7 @@ class _BalanceChartPainter extends CustomPainter {
           canvas,
           bars[i].label,
           Offset(x - 18, padT + plotH + 6),
-          color: AppTheme.mutedLight,
+          color: AppTheme.muted,
           size: 9,
           align: TextAlign.center,
           width: 36,
@@ -320,16 +487,18 @@ class _BalanceChartPainter extends CustomPainter {
     }
 
     // Горизонтальные уровни с ценой справа (как на бирже).
-    for (var k = (minV / step - 1e-9).ceil();
-        k <= (maxV / step + 1e-9).floor();
-        k++) {
+    for (
+      var k = (minV / step - 1e-9).ceil();
+      k <= (maxV / step + 1e-9).floor();
+      k++
+    ) {
       final v = k * step;
       final y = yOf(v);
       final zero = k == 0;
       final line = Paint()
         ..color = zero
-            ? AppTheme.mutedLight.withValues(alpha: 0.65)
-            : AppTheme.borderLight.withValues(alpha: 0.45)
+            ? AppTheme.muted.withValues(alpha: 0.65)
+            : AppTheme.border.withValues(alpha: 0.45)
         ..strokeWidth = zero ? 1.2 : 1;
       if (!zero) {
         _dashedLine(canvas, Offset(padL, y), Offset(padL + plotW, y), line);
@@ -341,7 +510,7 @@ class _BalanceChartPainter extends CustomPainter {
         fmtCompact(v),
         Offset(padL + plotW + 6, y - 6),
         color: zero
-            ? AppTheme.textLight
+            ? AppTheme.text
             : (v > 0 ? AppTheme.success : AppTheme.danger),
         size: 9,
       );
@@ -364,8 +533,8 @@ class _BalanceChartPainter extends CustomPainter {
           bh,
         ),
         Paint()
-            ..color = (b.close >= b.open ? AppTheme.success : AppTheme.danger)
-                .withValues(alpha: 0.28),
+          ..color = (b.close >= b.open ? AppTheme.success : AppTheme.danger)
+              .withValues(alpha: 0.28),
       );
     }
   }
@@ -380,7 +549,9 @@ class _BalanceChartPainter extends CustomPainter {
       canvas.drawLine(
         Offset(cx, yOf(b.high)),
         Offset(cx, yOf(b.low)),
-        Paint()..color = color..strokeWidth = 1.2,
+        Paint()
+          ..color = color
+          ..strokeWidth = 1.2,
       );
       final top = yOf(math.max(b.open, b.close));
       final bottom = yOf(math.min(b.open, b.close));
@@ -450,7 +621,7 @@ class _BalanceChartPainter extends CustomPainter {
     final x = padL + (idx + 0.5) * cell;
     final y = cursor!.dy.clamp(padT, padT + plotH);
     final line = Paint()
-      ..color = AppTheme.mutedLight.withValues(alpha: 0.7)
+      ..color = AppTheme.muted.withValues(alpha: 0.7)
       ..strokeWidth = 1;
     _dashedLine(canvas, Offset(x, padT), Offset(x, padT + plotH), line);
     _dashedLine(canvas, Offset(padL, y), Offset(padL + plotW, y), line);
@@ -485,14 +656,20 @@ class _BalanceChartPainter extends CustomPainter {
     final b = bars[idx];
     final change = b.close - b.open;
     final pct = b.open != 0 ? change / b.open.abs() * 100 : 0.0;
-    final color = change >= 0 ? const Color(0xFF0ECB81) : const Color(0xFFF6465D);
+    final color = change >= 0
+        ? const Color(0xFF0ECB81)
+        : const Color(0xFFF6465D);
     final text =
         'O ${fmtCompact(b.open)}  H ${fmtCompact(b.high)}  L ${fmtCompact(b.low)}  C ${fmtCompact(b.close)}  '
         '${change >= 0 ? '+' : ''}${fmtCompact(change)} (${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(2)}%)';
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: plotW - 8);
@@ -505,11 +682,7 @@ class _BalanceChartPainter extends CustomPainter {
     if (d == 0) return;
     final dir = (b - a) / d;
     for (var x = 0.0; x < d; x += dash * 2) {
-      canvas.drawLine(
-        a + dir * x,
-        a + dir * math.min(x + dash, d),
-        paint,
-      );
+      canvas.drawLine(a + dir * x, a + dir * math.min(x + dash, d), paint);
     }
   }
 
@@ -526,7 +699,11 @@ class _BalanceChartPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(fontSize: size, color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: size,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       textDirection: TextDirection.ltr,
       textAlign: align,
@@ -556,6 +733,14 @@ double _niceStep(double raw) {
   final exp = math.log(raw) / math.ln10;
   final p = math.pow(10, exp.floor()).toDouble();
   final f = raw / p;
-  final nice = f <= 1 ? 1.0 : f <= 2 ? 2.0 : f <= 2.5 ? 2.5 : f <= 5 ? 5.0 : 10.0;
+  final nice = f <= 1
+      ? 1.0
+      : f <= 2
+      ? 2.0
+      : f <= 2.5
+      ? 2.5
+      : f <= 5
+      ? 5.0
+      : 10.0;
   return nice * p;
 }

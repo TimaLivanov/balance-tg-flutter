@@ -21,11 +21,11 @@ class Budget {
     );
   }
   Map<String, dynamic> toJson() => {
-        'needs': needs,
-        'wants': wants,
-        'goals': goals,
-        'cushion': cushion,
-      };
+    'needs': needs,
+    'wants': wants,
+    'goals': goals,
+    'cushion': cushion,
+  };
 }
 
 class Health {
@@ -49,11 +49,11 @@ class Health {
     );
   }
   Map<String, dynamic> toJson() => {
-        'needsMax': needsMax,
-        'saveMin': saveMin,
-        'runwayMin': runwayMin,
-        'debtMonths': debtMonths,
-      };
+    'needsMax': needsMax,
+    'saveMin': saveMin,
+    'runwayMin': runwayMin,
+    'debtMonths': debtMonths,
+  };
 }
 
 class Category {
@@ -76,37 +76,35 @@ class Category {
     this.plan,
   });
   factory Category.fromJson(Map<dynamic, dynamic> j) => Category(
-        id: str(j['id']),
-        name: (j['name'] ?? 'Категория').toString(),
-        need: j['need'] == true,
-        rare: j['rare'] == true,
-        archived: j['archived'] == true,
-        resetDate: (j['resetDate'] ?? '').toString(),
-        spentBase: _num(j['spentBase']),
-        plan: j['plan'] is Map
-            ? Plan.fromJson(j['plan'] as Map<dynamic, dynamic>)
-            : null,
-      );
+    id: str(j['id']),
+    name: (j['name'] ?? 'Категория').toString(),
+    need: j['need'] == true,
+    rare: j['rare'] == true,
+    archived: j['archived'] == true,
+    resetDate: (j['resetDate'] ?? '').toString(),
+    spentBase: _num(j['spentBase']),
+    plan: j['plan'] is Map
+        ? Plan.fromJson(j['plan'] as Map<dynamic, dynamic>)
+        : null,
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'need': need,
-        'rare': rare,
-        'archived': archived,
-        'resetDate': resetDate,
-        'spentBase': spentBase,
-        'plan': plan?.toJson(),
-      };
+    'id': id,
+    'name': name,
+    'need': need,
+    'rare': rare,
+    'archived': archived,
+    'resetDate': resetDate,
+    'spentBase': spentBase,
+    'plan': plan?.toJson(),
+  };
 }
 
 class IncomeCategory {
   final String id;
   final String name;
   IncomeCategory({required this.id, required this.name});
-  factory IncomeCategory.fromJson(Map<dynamic, dynamic> j) => IncomeCategory(
-        id: str(j['id']),
-        name: (j['name'] ?? 'Доход').toString(),
-      );
+  factory IncomeCategory.fromJson(Map<dynamic, dynamic> j) =>
+      IncomeCategory(id: str(j['id']), name: (j['name'] ?? 'Доход').toString());
   Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
@@ -130,25 +128,25 @@ class Debt {
     this.archivedAt = '',
   });
   factory Debt.fromJson(Map<dynamic, dynamic> j) => Debt(
-        id: str(j['id']),
-        name: (j['name'] ?? 'Долг').toString(),
-        amount: _num(j['amount']),
-        due: (j['due'] ?? '').toString(),
-        date: (j['date'] ?? '').toString(),
-        rate: _num(j['rate']),
-        archived: j['archived'] == true,
-        archivedAt: (j['archivedAt'] ?? '').toString(),
-      );
+    id: str(j['id']),
+    name: (j['name'] ?? 'Долг').toString(),
+    amount: _num(j['amount']),
+    due: (j['due'] ?? '').toString(),
+    date: (j['date'] ?? '').toString(),
+    rate: _num(j['rate']),
+    archived: j['archived'] == true,
+    archivedAt: (j['archivedAt'] ?? '').toString(),
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'amount': amount,
-        'due': due,
-        'date': date,
-        'rate': rate,
-        'archived': archived,
-        'archivedAt': archivedAt,
-      };
+    'id': id,
+    'name': name,
+    'amount': amount,
+    'due': due,
+    'date': date,
+    'rate': rate,
+    'archived': archived,
+    'archivedAt': archivedAt,
+  };
 }
 
 class Plan {
@@ -157,15 +155,15 @@ class Plan {
   final String start;
   Plan({this.amount = 0, this.date = '', this.start = ''});
   factory Plan.fromJson(Map<dynamic, dynamic> j) => Plan(
-        amount: _num(j['amount'] ?? j['target']),
-        date: (j['date'] ?? '').toString(),
-        start: (j['start'] ?? '').toString(),
-      );
+    amount: _num(j['amount'] ?? j['target']),
+    date: (j['date'] ?? '').toString(),
+    start: (j['start'] ?? '').toString(),
+  );
   Map<String, dynamic> toJson() => {
-        'amount': amount,
-        'date': date,
-        'start': start,
-      };
+    'amount': amount,
+    'date': date,
+    'start': start,
+  };
 }
 
 class SavingsGoal {
@@ -190,29 +188,29 @@ class SavingsGoal {
     this.plan,
   });
   factory SavingsGoal.fromJson(Map<dynamic, dynamic> j) => SavingsGoal(
-        id: str(j['id']),
-        name: (j['name'] ?? 'Накопление').toString(),
-        kind: j['kind'] == 'invest' ? 'invest' : 'goal',
-        archived: j['archived'] == true,
-        closedAt: (j['closedAt'] ?? '').toString(),
-        closedAs: (j['closedAs'] ?? '').toString(),
-        closedAmount: _num(j['closedAmount']),
-        closedFunded: _num(j['closedFunded']),
-        plan: j['plan'] is Map
-            ? Plan.fromJson(j['plan'] as Map<dynamic, dynamic>)
-            : null,
-      );
+    id: str(j['id']),
+    name: (j['name'] ?? 'Накопление').toString(),
+    kind: j['kind'] == 'invest' ? 'invest' : 'goal',
+    archived: j['archived'] == true,
+    closedAt: (j['closedAt'] ?? '').toString(),
+    closedAs: (j['closedAs'] ?? '').toString(),
+    closedAmount: _num(j['closedAmount']),
+    closedFunded: _num(j['closedFunded']),
+    plan: j['plan'] is Map
+        ? Plan.fromJson(j['plan'] as Map<dynamic, dynamic>)
+        : null,
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'kind': kind,
-        'archived': archived,
-        'closedAt': closedAt,
-        'closedAs': closedAs,
-        'closedAmount': closedAmount,
-        'closedFunded': closedFunded,
-        'plan': plan?.toJson(),
-      };
+    'id': id,
+    'name': name,
+    'kind': kind,
+    'archived': archived,
+    'closedAt': closedAt,
+    'closedAs': closedAs,
+    'closedAmount': closedAmount,
+    'closedFunded': closedFunded,
+    'plan': plan?.toJson(),
+  };
 }
 
 class AutoPay {
@@ -235,25 +233,25 @@ class AutoPay {
     this.lastApplied = '',
   });
   factory AutoPay.fromJson(Map<dynamic, dynamic> j) => AutoPay(
-        id: str(j['id']),
-        name: (j['name'] ?? '').toString(),
-        amount: _num(j['amount']),
-        mode: j['mode'] == 'monthly' ? 'monthly' : 'daily',
-        day: _int(j['day'], fallback: 1).clamp(1, 31),
-        time: (j['time'] ?? '07:00').toString(),
-        catId: j['catId']?.toString(),
-        lastApplied: (j['lastApplied'] ?? '').toString(),
-      );
+    id: str(j['id']),
+    name: (j['name'] ?? '').toString(),
+    amount: _num(j['amount']),
+    mode: j['mode'] == 'monthly' ? 'monthly' : 'daily',
+    day: _int(j['day'], fallback: 1).clamp(1, 31),
+    time: (j['time'] ?? '07:00').toString(),
+    catId: j['catId']?.toString(),
+    lastApplied: (j['lastApplied'] ?? '').toString(),
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'amount': amount,
-        'mode': mode,
-        'day': day,
-        'time': time,
-        'catId': catId,
-        'lastApplied': lastApplied,
-      };
+    'id': id,
+    'name': name,
+    'amount': amount,
+    'mode': mode,
+    'day': day,
+    'time': time,
+    'catId': catId,
+    'lastApplied': lastApplied,
+  };
 }
 
 class Entry {
@@ -324,29 +322,31 @@ class Entry {
       cushOut: _num(j['cushOut']),
       cushIn: _num(j['cushIn']),
       note: (j['note'] ?? '').toString(),
-      autoItems: j['autoItems'] is List ? List<dynamic>.from(j['autoItems']) : [],
+      autoItems: j['autoItems'] is List
+          ? List<dynamic>.from(j['autoItems'])
+          : [],
       autoMk: j['autoMk'] is List ? List<dynamic>.from(j['autoMk']) : [],
     );
   }
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'date': date,
-        'income': income,
-        'incomeCat': incomeCat,
-        'expenses': expenses,
-        'debtPays': debtPays,
-        'savings': savings,
-        'savSpend': savSpend,
-        'cushOut': cushOut,
-        'cushIn': cushIn,
-        'note': note,
-        'debtId': debtId,
-        'debtAmt': debtAmt,
-        'creditCash': creditCash,
-        'autoItems': autoItems,
-        'autoMk': autoMk,
-      };
+    'id': id,
+    'type': type,
+    'date': date,
+    'income': income,
+    'incomeCat': incomeCat,
+    'expenses': expenses,
+    'debtPays': debtPays,
+    'savings': savings,
+    'savSpend': savSpend,
+    'cushOut': cushOut,
+    'cushIn': cushIn,
+    'note': note,
+    'debtId': debtId,
+    'debtAmt': debtAmt,
+    'creditCash': creditCash,
+    'autoItems': autoItems,
+    'autoMk': autoMk,
+  };
 }
 
 class AppState {
@@ -363,6 +363,7 @@ class AppState {
   String tf; // day / week / month / year
   String fontSize;
   String accent;
+  String theme; // light / dark
   String toastMode;
   int toastSec;
   bool toastSticky;
@@ -402,6 +403,7 @@ class AppState {
     this.tf = 'day',
     this.fontSize = 'm',
     this.accent = 'indigo',
+    this.theme = 'light',
     this.toastMode = 'auto',
     this.toastSec = 6,
     this.toastSticky = false,
@@ -429,18 +431,18 @@ class AppState {
   });
 
   factory AppState.empty() => AppState(
-        incomeCats: [IncomeCategory(id: '1', name: 'Работа')],
-        cats: [],
-        debts: [],
-        autopay: [],
-        savings: [],
-        history: [],
-        budget: Budget(),
-        health: Health(),
-        profile: {},
-        aiNotifications: [],
-        tgNotifyTimes: ['07:00', '12:00', '19:00'],
-      );
+    incomeCats: [IncomeCategory(id: '1', name: 'Работа')],
+    cats: [],
+    debts: [],
+    autopay: [],
+    savings: [],
+    history: [],
+    budget: Budget(),
+    health: Health(),
+    profile: {},
+    aiNotifications: [],
+    tgNotifyTimes: ['07:00', '12:00', '19:00'],
+  );
 
   factory AppState.fromJson(Map<String, dynamic> json) {
     final incomeCats = _list(json['incomeCats'])
@@ -452,15 +454,16 @@ class AppState {
     final tgTimes = _list(json['tgNotifyTimes'])
         .map((e) => e.toString())
         .toList();
-    while (tgTimes.length < 3) {
-      tgTimes.add(const ['07:00', '12:00', '19:00'][tgTimes.length]);
+    while (tgTimes.length < 10) {
+      tgTimes.add(const ['07:00', '12:00', '19:00'][tgTimes.length % 3]);
     }
     return AppState(
       v: _int(json['v'], fallback: 12),
       startCash: _num(json['startCash']),
       startCushion: _num(json['startCushion']),
       cushionMonths: _int(json['cushionMonths'], fallback: 3).clamp(1, 12),
-      cushionInclude: ['need', 'need_rare', 'all'].contains(json['cushionInclude'])
+      cushionInclude:
+          ['need', 'need_rare', 'all'].contains(json['cushionInclude'])
           ? json['cushionInclude'] as String
           : 'need',
       cushionBase: ['avg', 'rec', 'min'].contains(json['cushionBase'])
@@ -479,6 +482,9 @@ class AppState {
           : 'day',
       fontSize: (json['fontSize'] ?? 'm').toString(),
       accent: (json['accent'] ?? 'indigo').toString(),
+      theme: ['light', 'dark'].contains(json['theme'])
+          ? json['theme'] as String
+          : 'light',
       toastMode: (json['toastMode'] ?? 'auto').toString(),
       toastSec: _int(json['toastSec'], fallback: 6) < 1
           ? 6
@@ -503,14 +509,23 @@ class AppState {
           .toList(),
       cutLevel: (json['cutLevel'] ?? 'eff').toString(),
       preset: (json['preset'] ?? '50/30/20').toString(),
-      budget: Budget.fromJson(json['budget'] is Map ? json['budget'] as Map : null),
-      health: Health.fromJson(json['health'] is Map ? json['health'] as Map : null),
+      budget: Budget.fromJson(
+        json['budget'] is Map ? json['budget'] as Map : null,
+      ),
+      health: Health.fromJson(
+        json['health'] is Map ? json['health'] as Map : null,
+      ),
       profile: json['profile'] is Map
           ? Map<String, dynamic>.from(json['profile'] as Map)
           : {},
-      aiBehavior: [
-        'balanced', 'strict', 'coach', 'analyst', 'choleric'
-      ].contains(json['aiBehavior'])
+      aiBehavior:
+          [
+            'balanced',
+            'strict',
+            'coach',
+            'analyst',
+            'choleric',
+          ].contains(json['aiBehavior'])
           ? json['aiBehavior'] as String
           : 'balanced',
       aiNotifyTime: (json['aiNotifyTime'] ?? '09:00').toString(),
@@ -519,7 +534,9 @@ class AppState {
       aiMaxNotifications: _int(json['aiMaxNotifications'], fallback: 3),
       aiNotifications: _list(json['aiNotifications']),
       tgNotifyTimes: tgTimes,
-      tzOffset: json['tzOffset'] is num ? (json['tzOffset'] as num).toDouble() : null,
+      tzOffset: json['tzOffset'] is num
+          ? (json['tzOffset'] as num).toDouble()
+          : null,
       tgMessageMode: ['smart', 'ai'].contains(json['tgMessageMode'])
           ? json['tgMessageMode'] as String
           : 'smart',
@@ -527,44 +544,45 @@ class AppState {
   }
 
   Map<String, dynamic> toJson() => {
-        'v': v,
-        'startCash': startCash,
-        'startCushion': startCushion,
-        'cushionMonths': cushionMonths,
-        'cushionInclude': cushionInclude,
-        'cushionBase': cushionBase,
-        'windowDays': windowDays,
-        'strategy': strategy,
-        'hideBal': hideBal,
-        'chartMode': chartMode,
-        'tf': tf,
-        'fontSize': fontSize,
-        'accent': accent,
-        'toastMode': toastMode,
-        'toastSec': toastSec,
-        'toastSticky': toastSticky,
-        'remindDays': remindDays,
-        'incomeCats': incomeCats.map((e) => e.toJson()).toList(),
-        'cats': cats.map((e) => e.toJson()).toList(),
-        'debts': debts.map((e) => e.toJson()).toList(),
-        'autopay': autopay.map((e) => e.toJson()).toList(),
-        'savings': savings.map((e) => e.toJson()).toList(),
-        'history': history.map((e) => e.toJson()).toList(),
-        'cutLevel': cutLevel,
-        'preset': preset,
-        'budget': budget.toJson(),
-        'health': health.toJson(),
-        'profile': profile,
-        'aiBehavior': aiBehavior,
-        'aiNotifyTime': aiNotifyTime,
-        'aiQuietStart': aiQuietStart,
-        'aiQuietEnd': aiQuietEnd,
-        'aiMaxNotifications': aiMaxNotifications,
-        'aiNotifications': aiNotifications,
-        'tgNotifyTimes': tgNotifyTimes,
-        'tzOffset': tzOffset,
-        'tgMessageMode': tgMessageMode,
-      };
+    'v': v,
+    'startCash': startCash,
+    'startCushion': startCushion,
+    'cushionMonths': cushionMonths,
+    'cushionInclude': cushionInclude,
+    'cushionBase': cushionBase,
+    'windowDays': windowDays,
+    'strategy': strategy,
+    'hideBal': hideBal,
+    'chartMode': chartMode,
+    'tf': tf,
+    'fontSize': fontSize,
+    'accent': accent,
+    'theme': theme,
+    'toastMode': toastMode,
+    'toastSec': toastSec,
+    'toastSticky': toastSticky,
+    'remindDays': remindDays,
+    'incomeCats': incomeCats.map((e) => e.toJson()).toList(),
+    'cats': cats.map((e) => e.toJson()).toList(),
+    'debts': debts.map((e) => e.toJson()).toList(),
+    'autopay': autopay.map((e) => e.toJson()).toList(),
+    'savings': savings.map((e) => e.toJson()).toList(),
+    'history': history.map((e) => e.toJson()).toList(),
+    'cutLevel': cutLevel,
+    'preset': preset,
+    'budget': budget.toJson(),
+    'health': health.toJson(),
+    'profile': profile,
+    'aiBehavior': aiBehavior,
+    'aiNotifyTime': aiNotifyTime,
+    'aiQuietStart': aiQuietStart,
+    'aiQuietEnd': aiQuietEnd,
+    'aiMaxNotifications': aiMaxNotifications,
+    'aiNotifications': aiNotifications,
+    'tgNotifyTimes': tgNotifyTimes,
+    'tzOffset': tzOffset,
+    'tgMessageMode': tgMessageMode,
+  };
 }
 
 // ---- helpers (аналог JS-функций num/isObj/uid) ----
@@ -581,7 +599,8 @@ int _int(dynamic v, {int fallback = 0}) {
   return fallback;
 }
 
-List<dynamic> _list(dynamic v) => v is List ? List<dynamic>.from(v) : <dynamic>[];
+List<dynamic> _list(dynamic v) =>
+    v is List ? List<dynamic>.from(v) : <dynamic>[];
 
 Map<String, double> _numMap(dynamic v) {
   if (v is! Map) return {};

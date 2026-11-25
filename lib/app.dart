@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'theme/app_theme.dart';
 import 'state/app_controller.dart';
 import 'screens/login_screen.dart';
@@ -28,6 +29,21 @@ class _BalanceAppState extends State<BalanceApp> {
 
   @override
   Widget build(BuildContext context) {
+    AppTheme.applyAccent(_controller.state.accent);
+    AppTheme.applyTheme(_controller.state.theme);
+    final scale = switch (_controller.state.fontSize) {
+      's' => 0.9,
+      'l' => 1.15,
+      _ => 1.0,
+    };
+    Widget home(BuildContext context) => MediaQuery(
+      data: MediaQuery.of(context)
+          .copyWith(textScaler: TextScaler.linear(scale)),
+      child: _controller.authenticated || _controller.guest
+          ? HomeScreen(controller: _controller)
+          : LoginScreen(controller: _controller),
+    );
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -36,18 +52,20 @@ class _BalanceAppState extends State<BalanceApp> {
             title: 'BitBalance',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
-            themeMode: ThemeMode.light,
-            home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+            darkTheme: AppTheme.dark(),
+            themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
+            home: const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
           );
         }
         return MaterialApp(
           title: 'BitBalance',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
-          themeMode: ThemeMode.light,
-          home: _controller.authenticated || _controller.guest
-              ? HomeScreen(controller: _controller)
-              : LoginScreen(controller: _controller),
+          darkTheme: AppTheme.dark(),
+          themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
+          home: Builder(builder: home),
         );
       },
     );
