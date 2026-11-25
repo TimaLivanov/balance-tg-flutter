@@ -1,0 +1,620 @@
+import 'package:flutter/material.dart';
+
+import '../models/app_state.dart';
+import '../state/app_controller.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ui.dart';
+
+class MoneyScreen extends StatefulWidget {
+  final AppController controller;
+  const MoneyScreen({super.key, required this.controller});
+
+  @override
+  State<MoneyScreen> createState() => _MoneyScreenState();
+}
+
+class _MoneyScreenState extends State<MoneyScreen> {
+  AppController get c => widget.controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final cats = c.state.cats.where((x) => !x.archived).toList();
+    final debts = c.state.debts.where((x) => !x.archived).toList();
+    final savings = c.state.savings.where((x) => !x.archived).toList();
+    final archivedCats = c.state.cats.where((x) => x.archived).toList();
+    final archivedDebts = c.state.debts.where((x) => x.archived).toList();
+    final archivedSavings = c.state.savings.where((x) => x.archived).toList();
+    final calc = c.calc;
+
+    return Scaffold(
+      backgroundColor: AppTheme.bgLight,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ScreenHeader(
+              eyebrow: 'Деньги',
+              title: 'Категории и обязательства',
+              subtitle: 'Расходы, долги, накопления и подушка',
+              trailing: IconButton(
+                onPressed: () => c.commit(),
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            SectionCard(
+              title: 'Категории расходов',
+              subtitle: '${cats.length} активных',
+              action: TextButton.icon(
+                onPressed: () => _addCategoryDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Новая'),
+              ),
+              child: cats.isEmpty
+                  ? const _Empty('Пока нет категорий')
+                  : Column(
+                      children: cats.map((cat) {
+                        final plan = cat.plan;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: cat.need
+                                ? AppTheme.primary.withValues(alpha: .12)
+                                : AppTheme.bgLight,
+                            child: Icon(
+                              cat.need ? Icons.priority_high : Icons.category_outlined,
+                              color: cat.need ? AppTheme.primary : AppTheme.mutedLight,
+                              size: 18,
+                            ),
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(child: Text(cat.name)),
+                              if (cat.need)
+                                const _Tag('обяз.', AppTheme.primary),
+                              if (cat.rare) const _Tag('редк.', AppTheme.warning),
+                            ],
+                          ),
+                          subtitle: Text(
+                            plan != null
+                                ? 'План ${fmtMoney(plan.amount)} ₽ · ${plan.date}'
+                                : 'Без плана',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (v) => _catAction(v, cat.id),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'edit', child: Text('Редактировать')),
+                              PopupMenuItem(value: 'del', child: Text('Удалить')),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 16),
+
+            SectionCard(
+              title: 'Долги',
+              subtitle: 'Остаток ${fmtMoney(calc.debtTotal)} ₽',
+              action: TextButton.icon(
+                onPressed: () => _addDebtDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Новый'),
+              ),
+              child: debts.isEmpty
+                  ? const _Empty('Долгов нет')
+                  : Column(
+                      children: debts.map((d) {
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppTheme.danger.withValues(alpha: .1),
+                            child: const Icon(Icons.credit_card, color: AppTheme.danger, size: 18),
+                          ),
+                          title: Text(d.name),
+                          subtitle: Text(
+                            '${fmtMoney(d.amount)} ₽${d.due.isNotEmpty ? ' · до ${d.due}' : ''}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (v) => _debtAction(v, d.id),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'edit', child: Text('Редактировать')),
+                              PopupMenuItem(value: 'archive', child: Text('В архив')),
+                              PopupMenuItem(value: 'del', child: Text('Удалить')),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 16),
+
+            SectionCard(
+              title: 'Накопления и инвестиции',
+              subtitle: '${savings.length} целей',
+              action: TextButton.icon(
+                onPressed: () => _addSavingsDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Новая'),
+              ),
+              child: savings.isEmpty
+                  ? const _Empty('Целей пока нет')
+                  : Column(
+                      children: savings.map((g) {
+                        final target = g.plan?.amount ?? 0;
+                        final progress = target > 0 ? (g.closedFunded / target).clamp(0, 1) : 0.0;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: AppTheme.success.withValues(alpha: .1),
+                                child: Icon(
+                                  g.kind == 'invest' ? Icons.trending_up : Icons.savings,
+                                  color: AppTheme.success,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(g.name),
+                              subtitle: Text(
+                                'Цель ${fmtMoney(target)} ₽${g.plan?.date != null && g.plan!.date.isNotEmpty ? ' · до ${g.plan!.date}' : ''}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                onPressed: () async {
+                                  final ok = await confirmDialog(context,
+                                      title: 'Удалить цель?', message: 'Цель «${g.name}» будет удалена.');
+                                  if (ok == true) c.deleteSavings(g.id);
+                                },
+                              ),
+                            ),
+                            if (target > 0)
+                              ProgressLine(value: progress.toDouble(), color: AppTheme.success),
+                            const SizedBox(height: 8),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 16),
+
+            SectionCard(
+              title: 'Подушка',
+              subtitle: '${c.state.cushionMonths} месяцев запаса',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Сейчас', style: TextStyle(fontSize: 13)),
+                      Text('${fmtMoney(calc.cushion)} ₽',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Цель', style: TextStyle(fontSize: 13)),
+                      Text('${fmtMoney(calc.cushionGoal)} ₽',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ProgressLine(value: calc.cushionPct / 100, color: AppTheme.success),
+                  const SizedBox(height: 8),
+                  Text(
+                    calc.cushionRemaining > 0
+                        ? 'До цели ${fmtMoney(calc.cushionRemaining)} ₽ · рек. ${fmtMoney(calc.cushionRecPerDay)} ₽/день'
+                        : 'Цель набрана',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.mutedLight),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            SectionCard(
+              title: 'Доходные категории',
+              action: TextButton.icon(
+                onPressed: () => _addIncomeCatDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Добавить'),
+              ),
+              child: Wrap(
+                spacing: 8,
+                children: c.state.incomeCats
+                    .map(
+                      (e) => Chip(
+                        label: Text(e.name),
+                        onDeleted: e.id == '1'
+                            ? null
+                            : () {
+                                c.updateSetting((s) =>
+                                    s.incomeCats.removeWhere((x) => x.id == e.id));
+                              },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            SectionCard(
+              title: 'Автоплатежи',
+              subtitle: '${c.state.autopay.length} правил',
+              action: TextButton.icon(
+                onPressed: () => _addAutoPayDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Новый'),
+              ),
+              child: c.state.autopay.isEmpty
+                  ? const _Empty('Автоплатежей нет')
+                  : Column(
+                      children: c.state.autopay
+                          .map(
+                            (a) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(a.name),
+                              subtitle: Text(
+                                '${fmtMoney(a.amount)} ₽ · ${a.mode == 'monthly' ? 'каждое ${a.day}-е число' : 'каждый день'} · ${a.time}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                onPressed: () => c.deleteAutoPay(a.id),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+            ),
+            if (archivedCats.isNotEmpty || archivedDebts.isNotEmpty || archivedSavings.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SectionCard(
+                title: 'Архив',
+                subtitle: 'Закрытые цели и погашенные долги',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...archivedDebts.map(
+                      (d) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Долг: ${d.name}'),
+                        subtitle: const Text('в архиве', style: TextStyle(fontSize: 11)),
+                        trailing: TextButton(
+                          onPressed: () => c.updateDebt(d.id, archived: false),
+                          child: const Text('Вернуть'),
+                        ),
+                      ),
+                    ),
+                    ...archivedCats.map((x) => Text('Категория: ${x.name}',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.mutedLight))),
+                    ...archivedSavings.map((x) => Text('Цель: ${x.name}',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.mutedLight))),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _catAction(String action, String id) {
+    final cat = c.state.cats.firstWhere((x) => x.id == id);
+    if (action == 'del') {
+      confirmDialog(context, title: 'Удалить категорию?', message: 'Категория «${cat.name}» будет удалена.')
+          .then((ok) {
+        if (ok == true) c.deleteCategory(id);
+      });
+    } else {
+      _editCategoryDialog(cat);
+    }
+  }
+
+  void _debtAction(String action, String id) {
+    final d = c.state.debts.firstWhere((x) => x.id == id);
+    if (action == 'del') {
+      confirmDialog(context, title: 'Удалить долг?', message: 'Долг «${d.name}» и его записи будут удалены.')
+          .then((ok) {
+        if (ok == true) c.deleteDebt(id);
+      });
+    } else if (action == 'archive') {
+      c.updateDebt(id, archived: true);
+    } else {
+      _editDebtDialog(d);
+    }
+  }
+
+  Future<void> _addCategoryDialog() async {
+    final name = TextEditingController();
+    final plan = TextEditingController();
+    bool need = false;
+    bool rare = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Новая категория'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: plan,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Плановая сумма, ₽'),
+                ),
+                CheckboxListTile(
+                  value: need,
+                  title: const Text('обязательная (в подушку)'),
+                  onChanged: (v) => setS(() => need = v ?? false),
+                ),
+                CheckboxListTile(
+                  value: rare,
+                  title: const Text('редкая'),
+                  onChanged: (v) => setS(() => rare = v ?? false),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Добавить')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && name.text.trim().isNotEmpty) {
+      c.addCategory(name.text, need: need, rare: rare, plan: _d(plan.text));
+    }
+  }
+
+  Future<void> _editCategoryDialog(Category cat) async {
+    final name = TextEditingController(text: cat.name);
+    final plan = TextEditingController(text: cat.plan?.amount.toString() ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Редактировать категорию'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+            const SizedBox(height: 10),
+            TextField(
+              controller: plan,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'План, ₽'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сохранить')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      c.updateCategory(cat.id, name: name.text, plan: _d(plan.text));
+    }
+  }
+
+  Future<void> _addDebtDialog() async {
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    final due = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Новый долг'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+            const SizedBox(height: 10),
+            TextField(
+              controller: amount,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Сумма, ₽'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: due,
+              decoration: const InputDecoration(labelText: 'Срок (необязательно), ГГГГ-ММ-ДД'),
+            ),
+            const SizedBox(height: 8),
+            const Text('Деньги уже получены — долг добавится без изменения баланса.',
+                style: TextStyle(fontSize: 11, color: AppTheme.mutedLight)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Добавить')),
+        ],
+      ),
+    );
+    if (ok == true && name.text.trim().isNotEmpty) {
+      c.addDebt(name.text, _d(amount.text), due: due.text.trim());
+    }
+  }
+
+  Future<void> _editDebtDialog(Debt debt) async {
+    final name = TextEditingController(text: debt.name);
+    final amount = TextEditingController(text: debt.amount.toString());
+    final due = TextEditingController(text: debt.due);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Редактировать долг'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+            const SizedBox(height: 10),
+            TextField(
+              controller: amount,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Сумма, ₽'),
+            ),
+            const SizedBox(height: 10),
+            TextField(controller: due, decoration: const InputDecoration(labelText: 'Срок')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Сохранить')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      c.updateDebt(debt.id, name: name.text, amount: _d(amount.text), due: due.text);
+    }
+  }
+
+  Future<void> _addSavingsDialog() async {
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    String kind = 'goal';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Новая цель / инвестиция'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: kind,
+                decoration: const InputDecoration(labelText: 'Тип'),
+                items: const [
+                  DropdownMenuItem(value: 'goal', child: Text('Цель')),
+                  DropdownMenuItem(value: 'invest', child: Text('Инвестиция')),
+                ],
+                onChanged: (v) => setS(() => kind = v ?? 'goal'),
+              ),
+              const SizedBox(height: 10),
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: amount,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Целевая сумма, ₽'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Добавить')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && name.text.trim().isNotEmpty) {
+      c.addSavings(name.text, _d(amount.text), kind: kind);
+    }
+  }
+
+  Future<void> _addIncomeCatDialog() async {
+    final name = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Категория дохода'),
+        content: TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Добавить')),
+        ],
+      ),
+    );
+    if (ok == true && name.text.trim().isNotEmpty) {
+      c.updateSetting((s) => s.incomeCats.add(IncomeCategory(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: name.text.trim(),
+          )));
+    }
+  }
+
+  Future<void> _addAutoPayDialog() async {
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    String mode = 'daily';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Новый автоплатёж'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Название')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: amount,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Сумма, ₽'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: mode,
+                decoration: const InputDecoration(labelText: 'Периодичность'),
+                items: const [
+                  DropdownMenuItem(value: 'daily', child: Text('Каждый день')),
+                  DropdownMenuItem(value: 'monthly', child: Text('Каждый месяц')),
+                ],
+                onChanged: (v) => setS(() => mode = v ?? 'daily'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Добавить')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && name.text.trim().isNotEmpty) {
+      c.addAutoPay(name.text, _d(amount.text), mode: mode);
+    }
+  }
+
+  double _d(String v) => double.tryParse(v.replaceAll(',', '.')) ?? 0;
+}
+
+class _Empty extends StatelessWidget {
+  final String text;
+  const _Empty(this.text);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(text, style: const TextStyle(color: AppTheme.mutedLight, fontSize: 13)),
+      );
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Tag(this.text, this.color);
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 10, color: color)),
+      );
+}
