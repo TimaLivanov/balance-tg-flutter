@@ -122,7 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   if (c.guest)
                     OutlinedButton(
-                      onPressed: () => c.logout(),
+                      onPressed: () => c.openLogin(),
                       child: const Text('Войти'),
                     ),
                 ],

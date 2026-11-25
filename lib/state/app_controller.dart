@@ -113,9 +113,16 @@ class AppController extends ChangeNotifier {
     } catch (_) {}
     _authenticated = false;
     _email = null;
-    _guest = true;
+    _guest = false;
     _state = AppState.empty();
     _recalc();
+    notifyListeners();
+  }
+
+  /// Показать экран входа из гостевого режима, не теряя сохранённые данные.
+  Future<void> openLogin() async {
+    _authenticated = false;
+    _guest = false;
     notifyListeners();
   }
 
