@@ -291,16 +291,33 @@ class BalanceChartState extends State<BalanceChart> {
   /// Число свечей в окне нужно тестам и подписи масштаба.
   int get visibleCount => _visibleCount;
 
+  /// Закрепить сводку по свече программно (используется и в тестах).
+  void pinCandle(int index) {
+    if (index >= 0 && index < _visibleCount) _pinnedCandle.value = index;
+  }
+
+  /// Сводка привязана к дате свечи, а не к номеру в окне. Иначе при зуме
+  /// до трёх свечей она привязывалась к другой свече или исчезала.
+  void _rebasePinned(int oldStart, int oldEnd) {
+    final index = _pinnedCandle.value;
+    if (index == null || index < 0 || index >= oldEnd - oldStart) return;
+    final date = widget.bars[oldStart + index].date;
+    final (start, end) = _window();
+    final found = widget.bars.indexWhere((b) => b.date == date, start);
+    _pinnedCandle.value = found >= start && found < end ? found - start : null;
+  }
+
   void _commitCount(int count) {
     final next = _boundedCount(count);
     if (next == _barCount) return;
-    _pinnedCandle.value = null;
+    final (oldStart, oldEnd) = _window();
     setState(() {
       _barCount = next;
       _rightOffset = _rightOffset
           .clamp(0, math.max(0, widget.bars.length - next))
           .toDouble();
     });
+    _rebasePinned(oldStart, oldEnd);
     widget.onZoomChanged?.call(zoomFactor);
   }
 
@@ -309,10 +326,10 @@ class BalanceChartState extends State<BalanceChart> {
   void zoomOut() => _commitCount((_barCount * 1.25).round());
 
   void resetZoom() {
-    _pinnedCandle.value = null;
-    _commitCount(_baseCount);
+    final (oldStart, oldEnd) = _window();
     setState(() => _rightOffset = 0);
-    widget.onZoomChanged?.call(zoomFactor);
+    _rebasePinned(oldStart, oldEnd);
+    _commitCount(_baseCount);
   }
 
   @override
@@ -428,11 +445,13 @@ class BalanceChartState extends State<BalanceChart> {
           },
           onHorizontalDragUpdate: (d) {
             _dragAccum += d.delta.dx;
+            final (oldStart, oldEnd) = _window();
             setState(() {
               _rightOffset = (_startOffset + _dragAccum / _startCell)
                   .clamp(0, _maxOffset)
                   .toDouble();
             });
+            _rebasePinned(oldStart, oldEnd);
           },
           onHorizontalDragEnd: (_) {},
           onTapUp: (d) {

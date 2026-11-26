@@ -139,4 +139,57 @@ void main() {
     expect(find.textContaining('33%'), findsOneWidget);
     expect(find.textContaining('67%'), findsOneWidget);
   });
+
+  testWidgets('зум до трех свечей не ломает карточку графика', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final key = GlobalKey<BalanceChartState>();
+    final bars = List.generate(
+      14,
+      (i) => Bar(
+        date: '2026-01-${(i + 1).toString().padLeft(2, '0')}',
+        label: '${i + 1}',
+        open: 100 + i.toDouble(),
+        high: 101 + i.toDouble(),
+        low: 99 + i.toDouble(),
+        close: 100 + i.toDouble(),
+        income: 1000,
+        expense: 1500,
+        ops: ['Продукты: −500 ₽', 'Зарплата: +1000 ₽'],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BalanceChart(
+              key: key,
+              bars: bars,
+              showFlow: true,
+              height: 300,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Закрепляем правую свечу, чтобы она осталась в окне после зума до трёх.
+    key.currentState!.pinCandle(13);
+    await tester.pump();
+    expect(find.textContaining('Свеча'), findsOneWidget);
+
+    for (var i = 0; i < 10; i++) {
+      key.currentState!.zoomIn();
+      await tester.pump();
+    }
+
+    expect(key.currentState!.visibleCount, 3);
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('За период'), findsOneWidget);
+    expect(find.textContaining('Свеча'), findsOneWidget);
+    expect(find.byType(BalanceChart), findsOneWidget);
+  });
 }
