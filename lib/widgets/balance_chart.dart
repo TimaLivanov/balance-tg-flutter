@@ -213,6 +213,10 @@ class BalanceChart extends StatefulWidget {
   /// Показывать сводку по свече при наведении/касании (как в HTML).
   final bool showSummary;
 
+  /// Полоса доход/расход считается по видимому окну свечей.
+  final bool showFlow;
+  final bool hideBal;
+
   /// Сообщает экрану текущий масштаб, чтобы кнопки и подпись не расходились
   /// с жестом щипка.
   final ValueChanged<double>? onZoomChanged;
@@ -226,6 +230,8 @@ class BalanceChart extends StatefulWidget {
     this.zoom = 1,
     this.height = 240,
     this.showSummary = true,
+    this.showFlow = false,
+    this.hideBal = false,
     this.onZoomChanged,
   });
 
@@ -459,6 +465,8 @@ class BalanceChartState extends State<BalanceChart> {
                         },
                       ),
                     ),
+                    if (widget.showFlow && show.isNotEmpty)
+                      _FlowStrip(bars: show, hideBal: widget.hideBal),
                     if (widget.showSummary &&
                         pinned != null &&
                         pinned >= 0 &&
@@ -907,6 +915,96 @@ class _BalanceChartPainter extends CustomPainter {
       old.showVolume != showVolume ||
       old.cursor != cursor ||
       old.pinnedCandle != pinnedCandle;
+}
+
+/// Доход и расход строго по видимому окну: таймфрейм, зум и прокрутка.
+class _FlowStrip extends StatelessWidget {
+  final List<Bar> bars;
+  final bool hideBal;
+
+  const _FlowStrip({required this.bars, required this.hideBal});
+
+  static String _date(String value) => value.length >= 10
+      ? '${value.substring(5, 7)}.${value.substring(8, 10)}'
+      : value;
+
+  @override
+  Widget build(BuildContext context) {
+    final income = bars.fold(0.0, (sum, b) => sum + b.income);
+    final expense = bars.fold(0.0, (sum, b) => sum + b.expense);
+    final total = income + expense;
+    final incomePct = total > 0 ? (income / total * 100).round() : 0;
+    final expensePct = total > 0 ? 100 - incomePct : 0;
+    final period = _date(bars.first.date) == _date(bars.last.date)
+        ? _date(bars.first.date)
+        : '${_date(bars.first.date)} — ${_date(bars.last.date)}';
+
+    return Container(
+      color: ChartColors.panel,
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                'За период $period',
+                style: TextStyle(fontSize: 10, color: ChartColors.label),
+              ),
+              const Spacer(),
+              Text(
+                '${bars.length} свеч.',
+                style: TextStyle(fontSize: 10, color: ChartColors.label),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              if (income > 0)
+                Expanded(
+                  flex: incomePct.clamp(1, 99),
+                  child: _segment(
+                    'Доход ${hideBal ? '••••' : fmtMoney(income)} ₽ · $incomePct%',
+                    ChartColors.up,
+                  ),
+                ),
+              if (expense > 0)
+                Expanded(
+                  flex: expensePct.clamp(1, 99),
+                  child: _segment(
+                    'Расход ${hideBal ? '••••' : fmtMoney(expense)} ₽ · $expensePct%',
+                    ChartColors.down,
+                    align: TextAlign.right,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment(
+    String text,
+    Color color, {
+    TextAlign align = TextAlign.left,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+      color: color.withValues(alpha: 0.18),
+      child: Text(
+        text,
+        textAlign: align,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
 }
 
 /// Подробная сводка по свече: O/H/L/C, изменение, доход/расход и операции дня.

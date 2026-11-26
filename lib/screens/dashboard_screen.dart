@@ -206,9 +206,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final changePct = bars.isNotEmpty && bars.first.open != 0
         ? change / bars.first.open.abs() * 100
         : 0.0;
-    final flowIncome = bars.fold(0.0, (sum, b) => sum + b.income);
-    final flowExpense = bars.fold(0.0, (sum, b) => sum + b.expense);
-    final flowTotal = flowIncome + flowExpense;
     final activeCats = c.state.cats.where((x) => !x.archived).toList();
     final openDebts = c.state.debts
         .where(
@@ -483,6 +480,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             candle: _candle,
                             ma: _ma,
                             showVolume: _volume,
+                            showFlow: true,
+                            hideBal: c.state.hideBal,
                             height: 300,
                             onZoomChanged: (value) =>
                                 setState(() => _zoom = value),
@@ -537,53 +536,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                        if (flowTotal > 0)
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: (flowIncome * 100 / flowTotal)
-                                    .round()
-                                    .clamp(1, 99),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 5,
-                                  ),
-                                  color: ChartColors.up.withValues(alpha: 0.22),
-                                  child: Text(
-                                    'Доход ${(flowIncome * 100 / flowTotal).round()}%',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: ChartColors.up,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: (flowExpense * 100 / flowTotal)
-                                    .round()
-                                    .clamp(1, 99),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 5,
-                                  ),
-                                  color: ChartColors.down.withValues(
-                                    alpha: 0.22,
-                                  ),
-                                  child: Text(
-                                    'Расход ${(flowExpense * 100 / flowTotal).round()}%',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: ChartColors.down,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                       ],
                     ),
                   ),

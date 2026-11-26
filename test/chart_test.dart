@@ -100,4 +100,43 @@ void main() {
     expect(key.currentState!.zoomFactor, lessThan(zoomed));
     expect(key.currentState!.visibleCount, greaterThan(zoomedVisible));
   });
+
+  testWidgets('доход и расход считаются по видимому периоду', (tester) async {
+    final bars = List.generate(
+      4,
+      (i) => Bar(
+        date: '2026-01-0${i + 1}',
+        label: '${i + 1}',
+        open: 100,
+        high: 100,
+        low: 100,
+        close: 100,
+        income: 1000,
+        expense: 2000,
+      ),
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: const BalanceChart(bars: [], showFlow: true, height: 200),
+        ),
+      ),
+    );
+    // Пустой график не должен показывать полосу потоков.
+    expect(find.textContaining('За период'), findsNothing);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BalanceChart(bars: bars, showFlow: true, height: 200),
+        ),
+      ),
+    );
+    expect(find.textContaining('За период 01.01 — 01.04'), findsOneWidget);
+    expect(find.textContaining('Доход'), findsOneWidget);
+    expect(find.textContaining('Расход'), findsOneWidget);
+    expect(find.textContaining('33%'), findsOneWidget);
+    expect(find.textContaining('67%'), findsOneWidget);
+  });
 }
