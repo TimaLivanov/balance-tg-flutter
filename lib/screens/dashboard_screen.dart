@@ -17,7 +17,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late String _tf;
   late bool _candle;
-  bool _ma = false;
+  bool _ma = true;
+  bool _volume = true;
   bool _formExpanded = false;
 
   final _quickIncome = TextEditingController();
@@ -203,6 +204,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final changePct = bars.isNotEmpty && bars.first.open != 0
         ? change / bars.first.open.abs() * 100
         : 0.0;
+    final flowIncome = bars.fold(0.0, (sum, b) => sum + b.income);
+    final flowExpense = bars.fold(0.0, (sum, b) => sum + b.expense);
+    final flowTotal = flowIncome + flowExpense;
     final activeCats = c.state.cats.where((x) => !x.archived).toList();
     final openDebts = c.state.debts
         .where(
@@ -375,53 +379,194 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
 
-          // График
+          // График в стиле биржевого терминала из скриншота.
           SectionCard(
             title: 'Динамика баланса',
-            subtitle: 'Свечи, линия и скользящие средние',
-            action: TextButton(
-              onPressed: () => setState(() => _ma = !_ma),
-              child: Text(
-                'MA',
-                style: TextStyle(
-                  color: _ma ? AppTheme.warning : AppTheme.muted,
-                ),
-              ),
-            ),
+            subtitle: 'Свечи, объём и скользящие средние MA7 / MA14 / MA28',
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    for (final t in ['День', 'Нед', 'Мес', 'Год'])
-                      _pill(t, _tf == _tfKey(t), () => _setTf(_tfKey(t))),
-                    _pill('Свечи', _candle, () => _setMode(true)),
-                    _pill('Линия', !_candle, () => _setMode(false)),
-                  ],
-                ),
-                Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
-                    style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    color: ChartColors.bg,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Баланс',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: ChartColors.label,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                bars.isEmpty
+                                    ? _shown(calc.balance)
+                                    : _shown(bars.last.close),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${change >= 0 ? '+' : '−'}${changePct.abs().toStringAsFixed(2)}%',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: change >= 0
+                                      ? ChartColors.up
+                                      : ChartColors.down,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+                          child: Wrap(
+                            spacing: 5,
+                            runSpacing: 5,
+                            children: [
+                              for (final t in ['День', 'Нед', 'Мес', 'Год'])
+                                _terminalPill(
+                                  t,
+                                  _tf == _tfKey(t),
+                                  () => _setTf(_tfKey(t)),
+                                ),
+                              _terminalPill(
+                                'Свечи',
+                                _candle,
+                                () => _setMode(true),
+                              ),
+                              _terminalPill(
+                                'Линия',
+                                !_candle,
+                                () => _setMode(false),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (bars.isEmpty)
+                          SizedBox(
+                            height: 220,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                ),
+                                child: Text(
+                                  'Проведите первый день — здесь появится график баланса',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: ChartColors.label,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          BalanceChart(
+                            bars: bars,
+                            candle: _candle,
+                            ma: _ma,
+                            showVolume: _volume,
+                            height: 300,
+                          ),
+                        Container(
+                          color: ChartColors.panel,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            children: [
+                              _terminalPill(
+                                'MA',
+                                _ma,
+                                () => setState(() => _ma = !_ma),
+                              ),
+                              _terminalPill(
+                                'Объём',
+                                _volume,
+                                () => setState(() => _volume = !_volume),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Тяните · щипок · 2 тапа',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: ChartColors.label,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (flowTotal > 0)
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: (flowIncome * 100 / flowTotal)
+                                    .round()
+                                    .clamp(1, 99),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 5,
+                                  ),
+                                  color: ChartColors.up.withValues(alpha: 0.22),
+                                  child: Text(
+                                    'Доход ${(flowIncome * 100 / flowTotal).round()}%',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: ChartColors.up,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: (flowExpense * 100 / flowTotal)
+                                    .round()
+                                    .clamp(1, 99),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 5,
+                                  ),
+                                  color: ChartColors.down.withValues(
+                                    alpha: 0.22,
+                                  ),
+                                  child: Text(
+                                    'Расход ${(flowExpense * 100 / flowTotal).round()}%',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: ChartColors.down,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                const SizedBox(height: 10),
-                if (bars.isEmpty)
-                  SizedBox(
-                    height: 200,
-                    child: Center(
-                      child: Text(
-                        'Проведите первый день — здесь появится график баланса',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.muted, fontSize: 13),
-                      ),
-                    ),
-                  )
-                else
-                  BalanceChart(bars: bars, candle: _candle, ma: _ma),
+                const SizedBox(height: 8),
+                Text(
+                  'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
+                  style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                ),
               ],
             ),
           ),
@@ -795,6 +940,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(fontSize: 10, color: AppTheme.muted),
         ),
       ],
+    );
+  }
+
+  Widget _terminalPill(String label, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: active
+              ? ChartColors.ma7.withValues(alpha: 0.18)
+              : ChartColors.panel,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: active ? ChartColors.ma7 : ChartColors.grid,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: active ? ChartColors.ma7 : ChartColors.label,
+          ),
+        ),
+      ),
     );
   }
 

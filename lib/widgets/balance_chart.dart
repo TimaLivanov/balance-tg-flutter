@@ -184,12 +184,28 @@ String _key(DateTime d) =>
 DateTime _weekStart(DateTime d) =>
     DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
 
-/// График в стиле TradingView/Binance: свечи, MA, сетка, объём, перекрестие
-/// и легенда OHLC. Поддерживает масштабирование через [zoom].
+/// Палитра биржевого терминала из эталонного скриншота.
+class ChartColors {
+  static const bg = Color(0xFF080808);
+  static const panel = Color(0xFF121212);
+  static const grid = Color(0xFF404040);
+  static const gridSoft = Color(0xFF2A2A2A);
+  static const axis = Color(0xFFA0A0A0);
+  static const label = Color(0xFF707070);
+  static const up = Color(0xFF00C060);
+  static const down = Color(0xFFF03050);
+  static const ma7 = Color(0xFFE0B020);
+  static const ma14 = Color(0xFF6090B0);
+  static const ma28 = Color(0xFFC050A0);
+}
+
+/// График в стиле скриншота: чёрный терминал, свечи, MA7/MA14/MA28,
+/// объём, правосторонняя шкала цены и нижняя шкала дат.
 class BalanceChart extends StatefulWidget {
   final List<Bar> bars;
   final bool candle;
   final bool ma;
+  final bool showVolume;
   final double zoom;
   final double height;
 
@@ -201,6 +217,7 @@ class BalanceChart extends StatefulWidget {
     required this.bars,
     this.candle = true,
     this.ma = false,
+    this.showVolume = true,
     this.zoom = 1,
     this.height = 240,
     this.showSummary = true,
@@ -395,6 +412,7 @@ class _BalanceChartState extends State<BalanceChart> {
                               bars: show,
                               candle: widget.candle,
                               ma: widget.ma,
+                              showVolume: widget.showVolume,
                               cursor: cursor,
                               pinnedCandle: pinned,
                             ),
@@ -431,6 +449,7 @@ class _BalanceChartPainter extends CustomPainter {
   final List<Bar> bars;
   final bool candle;
   final bool ma;
+  final bool showVolume;
   final Offset? cursor;
   final int? pinnedCandle;
 
@@ -438,6 +457,7 @@ class _BalanceChartPainter extends CustomPainter {
     required this.bars,
     required this.candle,
     required this.ma,
+    required this.showVolume,
     required this.cursor,
     this.pinnedCandle,
   });
@@ -453,12 +473,12 @@ class _BalanceChartPainter extends CustomPainter {
   late double minV;
   late double maxV;
   late double step;
-  late double y0;
 
   double yOf(double v) => padT + (maxV - v) / (maxV - minV) * plotH;
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = ChartColors.bg);
     if (bars.isEmpty) return;
     plotW = size.width - padL - padR;
     plotH = size.height - padT - padB;
@@ -466,29 +486,25 @@ class _BalanceChartPainter extends CustomPainter {
     cell = plotW / bars.length;
 
     _calcRange();
-    y0 = (minV < 0 && maxV > 0)
-        ? yOf(0).clamp(padT, padT + plotH)
-        : (maxV <= 0 ? padT : padT + plotH);
 
-    _drawZones(canvas, size);
     _drawGrid(canvas, size);
-    _drawVolume(canvas);
+    if (showVolume) _drawVolume(canvas);
     if (candle) {
       _drawCandles(canvas);
     } else {
       _drawLine(canvas);
     }
     if (ma) {
-      _drawMa(canvas, 7, const Color(0xFFF0B90B));
-      _drawMa(canvas, 25, const Color(0xFFA78BFA));
+      _drawMa(canvas, 7, ChartColors.ma7);
+      _drawMa(canvas, 14, ChartColors.ma14);
+      _drawMa(canvas, 28, ChartColors.ma28);
     }
 
     final idx = _cursorIndex();
     if (idx != null) _drawCrosshair(canvas, size, idx);
-    final legendIdx = pinnedCandle ?? idx;
-    if (legendIdx != null && legendIdx >= 0 && legendIdx < bars.length) {
-      _drawCandleMarker(canvas, legendIdx);
-    }
+    final legendIdx = pinnedCandle ?? idx ?? bars.length - 1;
+    if (ma) _drawMaLegend(canvas, legendIdx);
+    _drawCandleMarker(canvas, legendIdx);
   }
 
   void _calcRange() {
@@ -527,27 +543,56 @@ class _BalanceChartPainter extends CustomPainter {
     return (x / cell).floor().clamp(0, bars.length - 1);
   }
 
-  void _drawZones(Canvas canvas, Size size) {
-    final green = Paint()
-      ..color = const Color(0xFF0ECB81).withValues(alpha: 0.045);
-    final red = Paint()
-      ..color = const Color(0xFFF6465D).withValues(alpha: 0.055);
-    canvas.drawRect(
-      Rect.fromLTWH(padL, padT, plotW, math.max(0, y0 - padT)),
-      green,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(padL, y0, plotW, math.max(0, padT + plotH - y0)),
-      red,
-    );
+  double? _maValue(int period, int index) {
+    if (index < period - 1 || index >= bars.length) return null;
+    var sum = 0.0;
+    for (var i = index - period + 1; i <= index; i++) {
+      sum += bars[i].close;
+    }
+    return sum / period;
+  }
+
+  void _drawMaLegend(Canvas canvas, int index) {
+    var x = padL + 4;
+    const y = 10.0;
+    for (final item in [
+      (7, ChartColors.ma7),
+      (14, ChartColors.ma14),
+      (28, ChartColors.ma28),
+    ]) {
+      final period = item.$1;
+      final color = item.$2;
+      final value = _maValue(period, index);
+      final label = value == null
+          ? 'MA$period: —'
+          : 'MA$period: ${fmtCompact(value)}';
+      _text(canvas, label, Offset(x, y), color: color, size: 10);
+      final width = _textWidth(label, 10) + 10;
+      x += width;
+      if (x > padL + plotW - 60) break;
+    }
+  }
+
+  double _textWidth(String text, double size) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(fontSize: size),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return tp.width;
   }
 
   void _drawGrid(Canvas canvas, Size size) {
-    final grid = Paint()
-      ..color = AppTheme.border.withValues(alpha: 0.55)
+    final vertical = Paint()
+      ..color = ChartColors.gridSoft
+      ..strokeWidth = 1;
+    final horizontal = Paint()
+      ..color = ChartColors.grid
       ..strokeWidth = 1;
 
-    // Вертикальная сетка и подписи времени.
+    // Вертикальная сетка и подписи времени — как в нижней оси скриншота.
     final labelEvery = bars.length > 20
         ? (bars.length / 7).ceil()
         : bars.length > 12
@@ -555,13 +600,13 @@ class _BalanceChartPainter extends CustomPainter {
         : 1;
     for (var i = 0; i < bars.length; i++) {
       final x = padL + (i + 0.5) * cell;
-      canvas.drawLine(Offset(x, padT), Offset(x, padT + plotH), grid);
+      canvas.drawLine(Offset(x, padT), Offset(x, padT + plotH), vertical);
       if (i % labelEvery == 0 || i == bars.length - 1) {
         _text(
           canvas,
           bars[i].label,
           Offset(x - 18, padT + plotH + 6),
-          color: AppTheme.muted,
+          color: ChartColors.label,
           size: 9,
           align: TextAlign.center,
           width: 36,
@@ -569,7 +614,8 @@ class _BalanceChartPainter extends CustomPainter {
       }
     }
 
-    // Горизонтальные уровни с ценой справа (как на бирже).
+    // Горизонтальные пунктирные уровни и правосторонняя шкала цены.
+    final last = bars.last.close;
     for (
       var k = (minV / step - 1e-9).ceil();
       k <= (maxV / step + 1e-9).floor();
@@ -577,24 +623,38 @@ class _BalanceChartPainter extends CustomPainter {
     ) {
       final v = k * step;
       final y = yOf(v);
-      final zero = k == 0;
-      final line = Paint()
-        ..color = zero
-            ? AppTheme.muted.withValues(alpha: 0.65)
-            : AppTheme.border.withValues(alpha: 0.45)
-        ..strokeWidth = zero ? 1.2 : 1;
-      if (!zero) {
-        _dashedLine(canvas, Offset(padL, y), Offset(padL + plotW, y), line);
+      final isLast = (v - last).abs() < step / 4;
+      if (k == 0) {
+        canvas.drawLine(
+          Offset(padL, y),
+          Offset(padL + plotW, y),
+          Paint()
+            ..color = ChartColors.axis
+            ..strokeWidth = 1,
+        );
       } else {
-        canvas.drawLine(Offset(padL, y), Offset(padL + plotW, y), line);
+        _dashedLine(
+          canvas,
+          Offset(padL, y),
+          Offset(padL + plotW, y),
+          horizontal,
+        );
+      }
+      final label = fmtCompact(v);
+      if (isLast) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(padL + plotW + 1, y - 8, padR - 2, 16),
+            const Radius.circular(2),
+          ),
+          Paint()..color = ChartColors.ma7,
+        );
       }
       _text(
         canvas,
-        fmtCompact(v),
+        label,
         Offset(padL + plotW + 6, y - 6),
-        color: zero
-            ? AppTheme.text
-            : (v > 0 ? AppTheme.success : AppTheme.danger),
+        color: isLast ? Colors.black : ChartColors.axis,
         size: 9,
       );
     }
@@ -616,8 +676,8 @@ class _BalanceChartPainter extends CustomPainter {
           bh,
         ),
         Paint()
-          ..color = (b.close >= b.open ? AppTheme.success : AppTheme.danger)
-              .withValues(alpha: 0.28),
+          ..color = (b.close >= b.open ? ChartColors.up : ChartColors.down)
+              .withValues(alpha: 0.45),
       );
     }
   }
@@ -627,7 +687,7 @@ class _BalanceChartPainter extends CustomPainter {
     for (var i = 0; i < bars.length; i++) {
       final b = bars[i];
       final up = b.close >= b.open;
-      final color = up ? const Color(0xFF0ECB81) : const Color(0xFFF6465D);
+      final color = up ? ChartColors.up : ChartColors.down;
       final cx = padL + (i + 0.5) * cell;
       canvas.drawLine(
         Offset(cx, yOf(b.high)),
@@ -660,7 +720,7 @@ class _BalanceChartPainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = up ? const Color(0xFF0ECB81) : const Color(0xFFF6465D)
+        ..color = up ? ChartColors.up : ChartColors.down
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke
         ..strokeJoin = StrokeJoin.round,
@@ -669,7 +729,7 @@ class _BalanceChartPainter extends CustomPainter {
       canvas.drawCircle(
         Offset(padL + (i + 0.5) * cell, yOf(bars[i].close)),
         2,
-        Paint()..color = up ? const Color(0xFF0ECB81) : const Color(0xFFF6465D),
+        Paint()..color = up ? ChartColors.up : ChartColors.down,
       );
     }
   }
@@ -704,7 +764,7 @@ class _BalanceChartPainter extends CustomPainter {
     final x = padL + (idx + 0.5) * cell;
     final y = cursor!.dy.clamp(padT, padT + plotH);
     final line = Paint()
-      ..color = AppTheme.muted.withValues(alpha: 0.7)
+      ..color = ChartColors.axis.withValues(alpha: 0.85)
       ..strokeWidth = 1;
     _dashedLine(canvas, Offset(x, padT), Offset(x, padT + plotH), line);
     _dashedLine(canvas, Offset(padL, y), Offset(padL + plotW, y), line);
@@ -712,9 +772,9 @@ class _BalanceChartPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(padL + plotW + 2, y - 8, padR - 4, 16),
-        const Radius.circular(3),
+        const Radius.circular(2),
       ),
-      Paint()..color = AppTheme.primary,
+      Paint()..color = ChartColors.grid,
     );
     _text(
       canvas,
@@ -731,7 +791,7 @@ class _BalanceChartPainter extends CustomPainter {
       size: 9,
       align: TextAlign.center,
       width: 36,
-      background: AppTheme.primary,
+      background: ChartColors.grid,
     );
   }
 
@@ -743,7 +803,7 @@ class _BalanceChartPainter extends CustomPainter {
         Rect.fromLTWH(x - 18, padT + plotH + 3, 36, 16),
         const Radius.circular(3),
       ),
-      Paint()..color = AppTheme.primary,
+      Paint()..color = ChartColors.grid,
     );
     _text(
       canvas,
@@ -805,6 +865,7 @@ class _BalanceChartPainter extends CustomPainter {
       old.bars != bars ||
       old.candle != candle ||
       old.ma != ma ||
+      old.showVolume != showVolume ||
       old.cursor != cursor ||
       old.pinnedCandle != pinnedCandle;
 }
