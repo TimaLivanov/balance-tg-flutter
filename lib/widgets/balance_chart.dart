@@ -253,25 +253,42 @@ class BalanceChartState extends State<BalanceChart> {
   @override
   void initState() {
     super.initState();
-    _barCount = _boundedCount((60 / widget.zoom).round());
+    _barCount = _boundedCount((_baseCount / widget.zoom).round());
   }
 
   @override
   void didUpdateWidget(covariant BalanceChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.zoom != widget.zoom) {
-      _commitCount(_boundedCount((60 / widget.zoom).round()));
+    if (oldWidget.bars.length != widget.bars.length ||
+        oldWidget.zoom != widget.zoom) {
+      // При смене таймфрейма сохраняем масштаб относительно нового окна.
+      final factor = _baseCountFor(oldWidget.bars.length) / _barCount;
+      _commitCount((_baseCount / factor).round());
     }
   }
 
-  int _boundedCount(int count) => count.clamp(8, 120);
+  /// За базу берём все доступные свечи, но не больше 60. Раньше база была
+  /// фиксированной, поэтому на 14 днях кнопки масштаба визуально ничего
+  /// не меняли: 14 свечей оставались 14-ю.
+  int _baseCountFor(int length) => math.max(1, math.min(60, length));
+  int get _baseCount => _baseCountFor(widget.bars.length);
 
-  /// Текущий масштаб: 1 — исходные 60 свечей, больше — крупнее свечи.
-  double get zoomFactor => 60 / _barCount;
+  int _boundedCount(int count) {
+    final max = math.max(1, widget.bars.length);
+    final min = math.min(3, max);
+    return count.clamp(min, max);
+  }
+
+  /// Текущий масштаб: 1 — все доступные свечи, больше — крупнее свечи.
+  double get zoomFactor => _baseCount / _barCount;
+
+  /// Число свечей в окне нужно тестам и подписи масштаба.
+  int get visibleCount => _visibleCount;
 
   void _commitCount(int count) {
     final next = _boundedCount(count);
     if (next == _barCount) return;
+    _pinnedCandle.value = null;
     setState(() {
       _barCount = next;
       _rightOffset = _rightOffset
@@ -287,8 +304,9 @@ class BalanceChartState extends State<BalanceChart> {
 
   void resetZoom() {
     _pinnedCandle.value = null;
-    _commitCount(_boundedCount((60 / widget.zoom).round()));
+    _commitCount(_baseCount);
     setState(() => _rightOffset = 0);
+    widget.onZoomChanged?.call(zoomFactor);
   }
 
   @override

@@ -110,101 +110,145 @@ class _MoneyScreenState extends State<MoneyScreen> {
                     children: cats.map((cat) {
                       final st = catStats(c.state, cat);
                       final plan = cat.plan;
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: cat.need
-                              ? AppTheme.primary.withValues(alpha: .12)
-                              : AppTheme.bg,
-                          child: cat.icon.isNotEmpty
-                              ? Text(
-                                  cat.icon,
-                                  style: const TextStyle(fontSize: 18),
-                                )
-                              : Icon(
-                                  cat.need
-                                      ? Icons.priority_high
-                                      : Icons.category_outlined,
-                                  color: cat.need
-                                      ? AppTheme.primary
-                                      : AppTheme.muted,
-                                  size: 18,
-                                ),
-                        ),
-                        onTap: () => _catOps(cat),
-                        title: Row(
-                          children: [
-                            Expanded(child: Text(cat.name)),
-                            if (cat.need) _Tag('обяз.', AppTheme.primary),
-                            if (cat.rare) const _Tag('редк.', AppTheme.warning),
-                            if (st.overdue)
-                              const _Tag('срок прошёл', AppTheme.danger),
-                          ],
-                        ),
-                        subtitle: Column(
+                      final hasDue = plan != null && plan.date.isNotEmpty;
+                      final closed = hasDue && plan.amount > 0
+                          ? (st.totalSpent / plan.amount * 100).round().clamp(
+                              0,
+                              100,
+                            )
+                          : 0;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (plan != null)
-                              Text(
-                                'План ${fmtMoney(plan.amount)} ₽'
-                                '${plan.date.isNotEmpty ? ' до ${fmtDateRu(plan.date)}' : ''}'
-                                '${st.remaining != null ? ' · осталось ${_shown(st.remaining!)} ₽' : ''}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            Text(
-                              'отдано ${_shown(st.totalSpent)} ₽'
-                              '${st.spentWin > 0.004 ? ' · за окно ${_shown(st.spentWin)} ₽' : ''}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            if (st.avgDay > 0.004)
-                              Text(
-                                'рек. ${fmtRec(st.avgDay)} ₽ / день',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.primary,
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(
+                                    alpha: .12,
+                                  ),
+                                  child: cat.icon.isNotEmpty
+                                      ? Text(
+                                          cat.icon,
+                                          style: const TextStyle(fontSize: 18),
+                                        )
+                                      : Icon(
+                                          cat.need
+                                              ? Icons.priority_high
+                                              : Icons.category_outlined,
+                                          color: cat.need
+                                              ? AppTheme.primary
+                                              : AppTheme.muted,
+                                          size: 18,
+                                        ),
                                 ),
-                              ),
-                            if (st.minDay != null && st.minDay! > 0.004)
-                              Text(
-                                'мин. ${fmtRec(st.minDay!)} ₽ / день',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF06B6D4),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              cat.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          if (cat.need)
+                                            _Tag('обяз.', AppTheme.primary),
+                                          if (cat.rare)
+                                            const _Tag(
+                                              'редк.',
+                                              AppTheme.warning,
+                                            ),
+                                          if (st.overdue)
+                                            const _Tag(
+                                              'срок прошёл',
+                                              AppTheme.danger,
+                                            ),
+                                        ],
+                                      ),
+                                      Text(
+                                        plan != null
+                                            ? 'план ${fmtMoney(plan.amount)} ₽'
+                                                  '${hasDue ? ' · до ${fmtDateRu(plan.date)}' : ''}'
+                                                  '${st.remaining != null ? ' · осталось ${_shown(st.remaining!)} ₽' : ''}'
+                                            : 'без плана',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.muted,
+                                        ),
+                                      ),
+                                      Text(
+                                        'отдано ${_shown(st.totalSpent)} ₽'
+                                        '${st.spentWin > 0.004 ? ' · за окно ${_shown(st.spentWin)} ₽' : ''}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.muted,
+                                        ),
+                                      ),
+                                      if (st.avgDay > 0.004)
+                                        Text(
+                                          'рек. ${c.state.hideBal ? '••••' : fmtRec(st.avgDay)} ₽ / день',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppTheme.primary,
+                                          ),
+                                        ),
+                                      if (st.minDay != null &&
+                                          st.minDay! > 0.004)
+                                        Text(
+                                          'мин. ${c.state.hideBal ? '••••' : fmtRec(st.minDay!)} ₽ / день'
+                                          '${st.daysLeft != null ? ' · ${st.daysLeft} дн.' : ''}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF06B6D4),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.restart_alt, size: 19),
-                              tooltip: 'Сбросить прогресс плана',
-                              onPressed: () =>
-                                  confirmDialog(
-                                    context,
-                                    title: 'Сбросить «отдано»?',
-                                    message:
-                                        'Прогресс по «${cat.name}» начнётся заново. '
-                                        'Баланс и история не изменятся.',
-                                    confirm: 'Сбросить',
-                                  ).then((ok) {
-                                    if (ok == true) c.resetCategory(cat.id);
-                                  }),
-                            ),
-                            PopupMenuButton<String>(
-                              onSelected: (v) => _catAction(v, cat.id),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Редактировать'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'del',
-                                  child: Text('Удалить'),
+                                PopupMenuButton<String>(
+                                  onSelected: (v) => _catAction(v, cat.id),
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'ops',
+                                      child: Text('Операции'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Редактировать'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'reset',
+                                      child: Text('Сбросить прогресс'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'del',
+                                      child: Text('Удалить'),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
+                            if (hasDue) ...[
+                              const SizedBox(height: 6),
+                              ProgressLine(value: closed / 100),
+                              const SizedBox(height: 2),
+                              Text(
+                                'плана $closed%',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.muted,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -573,7 +617,20 @@ class _MoneyScreenState extends State<MoneyScreen> {
 
   void _catAction(String action, String id) {
     final cat = c.state.cats.firstWhere((x) => x.id == id);
-    if (action == 'del') {
+    if (action == 'ops') {
+      _catOps(cat);
+    } else if (action == 'reset') {
+      confirmDialog(
+        context,
+        title: 'Сбросить «отдано»?',
+        message:
+            'Прогресс по «${cat.name}» начнётся заново. '
+            'Баланс и история не изменятся.',
+        confirm: 'Сбросить',
+      ).then((ok) {
+        if (ok == true) c.resetCategory(id);
+      });
+    } else if (action == 'del') {
       confirmDialog(
         context,
         title: 'Удалить категорию?',

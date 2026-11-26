@@ -48,10 +48,12 @@ void main() {
     expect(bars.first.open, closeTo(100000, 0.01));
   });
 
-  testWidgets('масштаб графика меняется кнопками', (tester) async {
+  testWidgets('масштаб графика меняется кнопками даже на коротком окне', (
+    tester,
+  ) async {
     final key = GlobalKey<BalanceChartState>();
     final bars = List.generate(
-      80,
+      14,
       (i) => Bar(
         date: '2026-01-01',
         label: '$i',
@@ -83,13 +85,19 @@ void main() {
     );
 
     final start = key.currentState!.zoomFactor;
+    final startVisible = key.currentState!.visibleCount;
+    expect(startVisible, 14);
+
     await tester.tap(find.text('Приблизить'));
     await tester.pump();
     expect(key.currentState!.zoomFactor, greaterThan(start));
+    expect(key.currentState!.visibleCount, lessThan(startVisible));
 
     final zoomed = key.currentState!.zoomFactor;
+    final zoomedVisible = key.currentState!.visibleCount;
     await tester.tap(find.text('Отдалить'));
     await tester.pump();
     expect(key.currentState!.zoomFactor, lessThan(zoomed));
+    expect(key.currentState!.visibleCount, greaterThan(zoomedVisible));
   });
 }
