@@ -184,19 +184,20 @@ String _key(DateTime d) =>
 DateTime _weekStart(DateTime d) =>
     DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
 
-/// Палитра биржевого терминала из эталонного скриншота.
+/// Цвета графика берутся из текущей темы приложения, чтобы график не
+/// выбивался из общего интерфейса.
 class ChartColors {
-  static const bg = Color(0xFF080808);
-  static const panel = Color(0xFF121212);
-  static const grid = Color(0xFF404040);
-  static const gridSoft = Color(0xFF2A2A2A);
-  static const axis = Color(0xFFA0A0A0);
-  static const label = Color(0xFF707070);
-  static const up = Color(0xFF00C060);
-  static const down = Color(0xFFF03050);
-  static const ma7 = Color(0xFFE0B020);
-  static const ma14 = Color(0xFF6090B0);
-  static const ma28 = Color(0xFFC050A0);
+  static Color get bg => AppTheme.card;
+  static Color get panel => AppTheme.bg;
+  static Color get grid => AppTheme.border;
+  static Color get gridSoft => AppTheme.border.withValues(alpha: 0.55);
+  static Color get axis => AppTheme.muted;
+  static Color get label => AppTheme.muted;
+  static Color get up => AppTheme.success;
+  static Color get down => AppTheme.danger;
+  static Color get ma7 => AppTheme.warning;
+  static Color get ma14 => AppTheme.primary;
+  static Color get ma28 => AppTheme.primary.withValues(alpha: 0.55);
 }
 
 /// График в стиле скриншота: чёрный терминал, свечи, MA7/MA14/MA28,
@@ -212,6 +213,10 @@ class BalanceChart extends StatefulWidget {
   /// Показывать сводку по свече при наведении/касании (как в HTML).
   final bool showSummary;
 
+  /// Сообщает экрану текущий масштаб, чтобы кнопки и подпись не расходились
+  /// с жестом щипка.
+  final ValueChanged<double>? onZoomChanged;
+
   const BalanceChart({
     super.key,
     required this.bars,
@@ -221,13 +226,14 @@ class BalanceChart extends StatefulWidget {
     this.zoom = 1,
     this.height = 240,
     this.showSummary = true,
+    this.onZoomChanged,
   });
 
   @override
-  State<BalanceChart> createState() => _BalanceChartState();
+  BalanceChartState createState() => BalanceChartState();
 }
 
-class _BalanceChartState extends State<BalanceChart> {
+class BalanceChartState extends State<BalanceChart> {
   /// Как в Binance: окно свечей и сдвиг по истории живут внутри графика.
   late int _barCount;
   double _rightOffset = 0;
@@ -247,7 +253,42 @@ class _BalanceChartState extends State<BalanceChart> {
   @override
   void initState() {
     super.initState();
-    _barCount = (60 / widget.zoom).round().clamp(8, 120);
+    _barCount = _boundedCount((60 / widget.zoom).round());
+  }
+
+  @override
+  void didUpdateWidget(covariant BalanceChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.zoom != widget.zoom) {
+      _commitCount(_boundedCount((60 / widget.zoom).round()));
+    }
+  }
+
+  int _boundedCount(int count) => count.clamp(8, 120);
+
+  /// Текущий масштаб: 1 — исходные 60 свечей, больше — крупнее свечи.
+  double get zoomFactor => 60 / _barCount;
+
+  void _commitCount(int count) {
+    final next = _boundedCount(count);
+    if (next == _barCount) return;
+    setState(() {
+      _barCount = next;
+      _rightOffset = _rightOffset
+          .clamp(0, math.max(0, widget.bars.length - next))
+          .toDouble();
+    });
+    widget.onZoomChanged?.call(zoomFactor);
+  }
+
+  void zoomIn() => _commitCount((_barCount / 1.25).round());
+
+  void zoomOut() => _commitCount((_barCount * 1.25).round());
+
+  void resetZoom() {
+    _pinnedCandle.value = null;
+    _commitCount(_boundedCount((60 / widget.zoom).round()));
+    setState(() => _rightOffset = 0);
   }
 
   @override
@@ -294,13 +335,7 @@ class _BalanceChartState extends State<BalanceChart> {
     return (start, end);
   }
 
-  void _reset() {
-    _pinnedCandle.value = null;
-    setState(() {
-      _barCount = (60 / widget.zoom).round().clamp(8, 120);
-      _rightOffset = 0;
-    });
-  }
+  void _reset() => resetZoom();
 
   @override
   Widget build(BuildContext context) {
@@ -333,15 +368,7 @@ class _BalanceChartState extends State<BalanceChart> {
               _pinchDistance! > 0) {
             final p = _pointers.values.toList();
             final ratio = (p[0] - p[1]).distance / _pinchDistance!;
-            final count = (_pinchStartCount! / ratio).round().clamp(8, 120);
-            if (count != _barCount) {
-              setState(() {
-                _barCount = count;
-                _rightOffset = _rightOffset
-                    .clamp(0, math.max(0, widget.bars.length - count))
-                    .toDouble();
-              });
-            }
+            _commitCount((_pinchStartCount! / ratio).round());
             return;
           }
           if (e.kind == PointerDeviceKind.mouse) {
@@ -361,13 +388,7 @@ class _BalanceChartState extends State<BalanceChart> {
               HardwareKeyboard.instance.isControlPressed ||
               HardwareKeyboard.instance.isMetaPressed;
           if (e is PointerScrollEvent && zoomModifier) {
-            setState(() {
-              _barCount = (_barCount + (e.scrollDelta.dy > 0 ? 2 : -2)).clamp(
-                8,
-                120,
-              );
-              _rightOffset = _rightOffset.clamp(0, _maxOffset).toDouble();
-            });
+            _commitCount(_barCount + (e.scrollDelta.dy > 0 ? 2 : -2));
           }
         },
         // Только жесты, участвующие в арене, чтобы родительский скролл
@@ -463,7 +484,7 @@ class _BalanceChartPainter extends CustomPainter {
   });
 
   static const padL = 6.0;
-  static const padR = 62.0;
+  static const padR = 38.0;
   static const padT = 34.0;
   static const padB = 24.0;
 

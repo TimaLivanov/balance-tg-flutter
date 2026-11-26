@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:balance_tg_flutter/models/app_state.dart';
@@ -17,17 +18,17 @@ void main() {
     }
 
     Entry day(String id, int back, double income, double expense) => Entry(
-          id: id,
-          type: 'day',
-          date: key(back),
-          income: income,
-          expenses: {'food': expense},
-          debtPays: {},
-          savings: {},
-          savSpend: {},
-          autoItems: [],
-          autoMk: [],
-        );
+      id: id,
+      type: 'day',
+      date: key(back),
+      income: income,
+      expenses: {'food': expense},
+      debtPays: {},
+      savings: {},
+      savSpend: {},
+      autoItems: [],
+      autoMk: [],
+    );
 
     state.history.addAll([
       day('1', 3, 50000, 10000),
@@ -38,9 +39,57 @@ void main() {
     final calc = recalc(state);
     final bars = buildBars(calc.points, 'day');
     expect(bars.length, 4);
-    expect(bars.any((b) => b.high > b.low), isTrue,
-        reason: 'все свечи плоские — OHLC не попал в график');
+    expect(
+      bars.any((b) => b.high > b.low),
+      isTrue,
+      reason: 'все свечи плоские — OHLC не попал в график',
+    );
     expect(bars.last.close, closeTo(calc.balance, 0.01));
     expect(bars.first.open, closeTo(100000, 0.01));
+  });
+
+  testWidgets('масштаб графика меняется кнопками', (tester) async {
+    final key = GlobalKey<BalanceChartState>();
+    final bars = List.generate(
+      80,
+      (i) => Bar(
+        date: '2026-01-01',
+        label: '$i',
+        open: 100 + i.toDouble(),
+        high: 101 + i.toDouble(),
+        low: 99 + i.toDouble(),
+        close: 100 + i.toDouble(),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              BalanceChart(key: key, bars: bars, height: 200),
+              TextButton(
+                onPressed: () => key.currentState!.zoomIn(),
+                child: const Text('Приблизить'),
+              ),
+              TextButton(
+                onPressed: () => key.currentState!.zoomOut(),
+                child: const Text('Отдалить'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final start = key.currentState!.zoomFactor;
+    await tester.tap(find.text('Приблизить'));
+    await tester.pump();
+    expect(key.currentState!.zoomFactor, greaterThan(start));
+
+    final zoomed = key.currentState!.zoomFactor;
+    await tester.tap(find.text('Отдалить'));
+    await tester.pump();
+    expect(key.currentState!.zoomFactor, lessThan(zoomed));
   });
 }

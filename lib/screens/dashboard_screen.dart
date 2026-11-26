@@ -19,6 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late bool _candle;
   bool _ma = true;
   bool _volume = true;
+  double _zoom = 1;
+  final _chartKey = GlobalKey<BalanceChartState>();
   bool _formExpanded = false;
 
   final _quickIncome = TextEditingController();
@@ -476,11 +478,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           )
                         else
                           BalanceChart(
+                            key: _chartKey,
                             bars: bars,
                             candle: _candle,
                             ma: _ma,
                             showVolume: _volume,
                             height: 300,
+                            onZoomChanged: (value) =>
+                                setState(() => _zoom = value),
                           ),
                         Container(
                           color: ChartColors.panel,
@@ -501,12 +506,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 () => setState(() => _volume = !_volume),
                               ),
                               const Spacer(),
-                              Text(
-                                'Тяните · щипок · 2 тапа',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: ChartColors.label,
+                              _terminalPill(
+                                '−',
+                                false,
+                                () => _chartKey.currentState?.zoomOut(),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
                                 ),
+                                child: Text(
+                                  '×${_zoom.toStringAsFixed(1)}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: ChartColors.axis,
+                                  ),
+                                ),
+                              ),
+                              _terminalPill(
+                                '+',
+                                false,
+                                () => _chartKey.currentState?.zoomIn(),
+                              ),
+                              _terminalPill(
+                                '↺',
+                                false,
+                                () => _chartKey.currentState?.resetZoom(),
                               ),
                             ],
                           ),
@@ -526,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: Text(
                                     'Доход ${(flowIncome * 100 / flowTotal).round()}%',
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       color: ChartColors.up,
@@ -548,7 +574,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: Text(
                                     'Расход ${(flowExpense * 100 / flowTotal).round()}%',
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       color: ChartColors.down,
@@ -564,7 +590,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Жесты: тяните влево/вправо по истории, щипок — масштаб, двойной тап — сброс.',
+                  'Масштаб кнопками − / +, жестом щипка или Ctrl/⌘ + колесо. Тяните влево/вправо по истории, двойной тап — сброс.',
                   style: TextStyle(fontSize: 10, color: AppTheme.muted),
                 ),
               ],
