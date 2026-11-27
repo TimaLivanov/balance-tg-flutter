@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/app_state.dart';
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
+import '../utils/work_stats.dart';
 import '../widgets/balance_chart.dart';
 import '../widgets/heatmap.dart';
 import '../widgets/ui.dart';
@@ -204,66 +205,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return items;
   }
 
-  Map<String, dynamic> _workStats() {
-    final now = DateTime.now();
-    final incomeByDate = <String, double>{};
-    for (final h in c.state.history) {
-      if (h.type == 'debt' ||
-          h.type == 'goal_spend' ||
-          h.type == 'invest_close')
-        continue;
-      incomeByDate[h.date] = (incomeByDate[h.date] ?? 0) + h.income;
-    }
-    final offByDow = List<int>.filled(7, 0);
-    int work = 0;
-    int off = 0;
-    for (var i = 89; i >= 0; i--) {
-      final d = DateTime(
-        now.year,
-        now.month,
-        now.day,
-      ).subtract(Duration(days: i));
-      if (d.isAfter(DateTime(now.year, now.month, now.day))) continue;
-      final key =
-          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      if (key ==
-          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}')
-        continue;
-      final dow = (d.weekday - 1) % 7;
-      if ((incomeByDate[key] ?? 0) > 0.004) {
-        work++;
-      } else {
-        off++;
-        offByDow[dow]++;
-      }
-    }
-    var maxOff = -1;
-    var maxI = 0;
-    for (var i = 0; i < 7; i++) {
-      if (offByDow[i] > maxOff) {
-        maxOff = offByDow[i];
-        maxI = i;
-      }
-    }
-    DateTime? nextGuess;
-    if (maxOff > 0) {
-      for (var k = 1; k <= 14; k++) {
-        final d = DateTime(now.year, now.month, now.day).add(Duration(days: k));
-        if ((d.weekday - 1) % 7 == maxI) {
-          nextGuess = d;
-          break;
-        }
-      }
-    }
-    return {
-      'work': work,
-      'off': off,
-      'offByDow': offByDow,
-      'maxI': maxI,
-      'maxOff': maxOff,
-      'next': nextGuess,
-    };
-  }
+  Map<String, dynamic> _workStats() => workStats(c.state);
 
   List<String> _plusIdeas(double netDay, double avgInc, double daysCount) {
     final ideas = <Map<String, dynamic>>[];
