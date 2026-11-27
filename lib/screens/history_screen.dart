@@ -19,7 +19,11 @@ class _OpLine {
 
 class HistoryScreen extends StatefulWidget {
   final AppController controller;
-  const HistoryScreen({super.key, required this.controller});
+
+  /// Редактирование открывается в полной записи через центральную кнопку «+».
+  final void Function(Entry entry)? onEditEntry;
+
+  const HistoryScreen({super.key, required this.controller, this.onEditEntry});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -425,9 +429,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         size: 18,
                                       ),
                                       tooltip: 'Редактировать',
-                                      onPressed: () => _toast(
-                                        'Правка доступна в полной записи',
-                                      ),
+                                      onPressed: () =>
+                                          widget.onEditEntry?.call(e),
                                     ),
                                   IconButton(
                                     icon: const Icon(

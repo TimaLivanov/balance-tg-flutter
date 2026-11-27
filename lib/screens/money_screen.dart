@@ -7,7 +7,15 @@ import '../widgets/ui.dart';
 
 class MoneyScreen extends StatefulWidget {
   final AppController controller;
-  const MoneyScreen({super.key, required this.controller});
+
+  /// При встраивании в общий экран заголовок рисует родитель.
+  final bool showHeader;
+
+  const MoneyScreen({
+    super.key,
+    required this.controller,
+    this.showHeader = true,
+  });
 
   @override
   State<MoneyScreen> createState() => _MoneyScreenState();
@@ -41,16 +49,18 @@ class _MoneyScreenState extends State<MoneyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ScreenHeader(
-            eyebrow: 'Деньги',
-            title: 'Категории и обязательства',
-            subtitle: 'Расходы, долги, накопления и подушка',
-            trailing: IconButton(
-              onPressed: () => c.commit(),
-              icon: const Icon(Icons.refresh),
+          if (widget.showHeader) ...[
+            ScreenHeader(
+              eyebrow: 'Деньги',
+              title: 'Категории и обязательства',
+              subtitle: 'Расходы, долги, накопления и подушка',
+              trailing: IconButton(
+                onPressed: () => c.commit(),
+                icon: const Icon(Icons.refresh),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 20),
+          ],
 
           SectionCard(
             title: 'Подушка',

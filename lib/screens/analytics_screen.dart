@@ -9,7 +9,15 @@ import '../widgets/ui.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final AppController controller;
-  const AnalyticsScreen({super.key, required this.controller});
+
+  /// При встраивании в «Деньги» заголовок рисует родитель.
+  final bool showHeader;
+
+  const AnalyticsScreen({
+    super.key,
+    required this.controller,
+    this.showHeader = true,
+  });
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -356,12 +364,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ScreenHeader(
-            eyebrow: 'Аналитика',
-            title: 'Цифры и тренды',
-            subtitle: 'Здоровье денег, графики и прогнозы',
-          ),
-          const SizedBox(height: 20),
+          if (widget.showHeader) ...[
+            ScreenHeader(
+              eyebrow: 'Аналитика',
+              title: 'Цифры и тренды',
+              subtitle: 'Здоровье денег, графики и прогнозы',
+            ),
+            const SizedBox(height: 20),
+          ],
           Row(
             children: [
               const Text('Период', style: TextStyle(fontSize: 13)),

@@ -482,20 +482,28 @@ class AppController extends ChangeNotifier {
     String? editingId,
   }) {
     final id = editingId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final old = editingId == null
+        ? null
+        : _state.history.where((h) => h.id == id).firstOrNull;
     final entry = Entry(
       id: id,
-      type: 'day',
+      type: old?.type ?? 'day',
       date: date,
       income: income,
+      incomeCat: old?.incomeCat,
       expenses: expenses,
       debtPays: debtPays,
       savings: savings,
-      savSpend: {},
+      // Эти поля форма не редактирует, поэтому при правке сохраняем их.
+      savSpend: old?.savSpend ?? {},
       cushIn: cushIn,
       cushOut: cushOut,
       note: note,
-      autoItems: [],
-      autoMk: [],
+      debtId: old?.debtId,
+      debtAmt: old?.debtAmt ?? 0,
+      creditCash: old?.creditCash ?? false,
+      autoItems: old?.autoItems ?? [],
+      autoMk: old?.autoMk ?? [],
     );
     final idx = _state.history.indexWhere((h) => h.id == id);
     if (idx >= 0) {

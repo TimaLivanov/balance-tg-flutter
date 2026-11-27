@@ -11,7 +11,15 @@ class FullEntryForm extends StatefulWidget {
   final AppController controller;
   final VoidCallback? onDone;
 
-  const FullEntryForm({super.key, required this.controller, this.onDone});
+  /// Если передана запись, форма открывается в режиме её редактирования.
+  final Entry? editing;
+
+  const FullEntryForm({
+    super.key,
+    required this.controller,
+    this.onDone,
+    this.editing,
+  });
 
   @override
   State<FullEntryForm> createState() => _FullEntryFormState();
@@ -28,11 +36,35 @@ class _FullEntryFormState extends State<FullEntryForm> {
   final Map<String, TextEditingController> _exp = {};
   final Map<String, TextEditingController> _debts = {};
   final Map<String, TextEditingController> _savings = {};
-  DateTime _entryDate = DateTime.now();
+  DateTime _entryDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
 
   @override
   void initState() {
     super.initState();
+    final edit = widget.editing;
+    if (edit != null) {
+      _entryDate = DateTime.tryParse(edit.date) ?? DateTime.now();
+      _income.text = edit.income > 0 ? fmtRec(edit.income) : '';
+      _cushIn.text = edit.cushIn > 0 ? fmtRec(edit.cushIn) : '';
+      _cushOut.text = edit.cushOut > 0 ? fmtRec(edit.cushOut) : '';
+      _note.text = edit.note;
+      _exp.addAll({
+        for (final e in edit.expenses.entries)
+          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+      });
+      _debts.addAll({
+        for (final e in edit.debtPays.entries)
+          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+      });
+      _savings.addAll({
+        for (final e in edit.savings.entries)
+          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+      });
+    }
     _dateCtrl.text = fmtDateRu(_dateStr(_entryDate));
   }
 
@@ -191,8 +223,9 @@ class _FullEntryFormState extends State<FullEntryForm> {
       cushIn: ci,
       cushOut: co,
       note: _note.text.trim(),
+      editingId: widget.editing?.id,
     );
-    _toast('День проведён');
+    _toast(widget.editing == null ? 'День проведён' : 'Операция обновлена');
     widget.onDone?.call();
   }
 
@@ -229,7 +262,9 @@ class _FullEntryFormState extends State<FullEntryForm> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Полная запись дня',
+                      widget.editing == null
+                          ? 'Полная запись дня'
+                          : 'Редактирование операции',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 2),
@@ -506,7 +541,9 @@ class _FullEntryFormState extends State<FullEntryForm> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: _submit,
-                    child: const Text('Провести день'),
+                    child: Text(
+                      widget.editing == null ? 'Провести день' : 'Сохранить',
+                    ),
                   ),
                 ),
               ],
