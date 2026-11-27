@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/app_state.dart';
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/balance_chart.dart';
@@ -21,7 +20,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _volume = true;
   double _zoom = 1;
   final _chartKey = GlobalKey<BalanceChartState>();
-  bool _formExpanded = false;
 
   final _quickIncome = TextEditingController();
   final _quickExpense = TextEditingController();
@@ -29,15 +27,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _quickIncomeCat;
   String? _quickExpCat;
   int _quickOffset = 0;
-
-  final _income = TextEditingController();
-  final _cushIn = TextEditingController();
-  final _cushOut = TextEditingController();
-  final _note = TextEditingController();
-  final Map<String, TextEditingController> _exp = {};
-  final Map<String, TextEditingController> _debts = {};
-  final Map<String, TextEditingController> _savings = {};
-  DateTime _entryDate = DateTime.now();
 
   AppController get c => widget.controller;
 
@@ -53,19 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _quickIncome.dispose();
     _quickExpense.dispose();
     _quickNote.dispose();
-    _income.dispose();
-    _cushIn.dispose();
-    _cushOut.dispose();
-    _note.dispose();
-    for (final v in _exp.values) {
-      v.dispose();
-    }
-    for (final v in _debts.values) {
-      v.dispose();
-    }
-    for (final v in _savings.values) {
-      v.dispose();
-    }
     super.dispose();
   }
 
@@ -148,54 +124,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _toast(String msg) {
     if (!mounted) return;
     appToast(context, msg, c.state);
-  }
-
-  void _submitFull() {
-    final exp = <String, double>{};
-    _exp.forEach((k, v) {
-      final val = _num(v);
-      if (val > 0) exp[k] = val;
-    });
-    final pays = <String, double>{};
-    _debts.forEach((k, v) {
-      final val = _num(v);
-      if (val > 0) pays[k] = val;
-    });
-    final sav = <String, double>{};
-    _savings.forEach((k, v) {
-      final val = _num(v);
-      if (val > 0) sav[k] = val;
-    });
-    final income = _num(_income);
-    final ci = _num(_cushIn);
-    final co = _num(_cushOut);
-    if (income <= 0 &&
-        exp.isEmpty &&
-        pays.isEmpty &&
-        sav.isEmpty &&
-        ci <= 0 &&
-        co <= 0) {
-      _toast('Введите хотя бы одну сумму');
-      return;
-    }
-    c.saveDayEntry(
-      date: _dateStr(_entryDate),
-      income: income,
-      expenses: exp,
-      debtPays: pays,
-      savings: sav,
-      cushIn: ci,
-      cushOut: co,
-      note: _note.text.trim(),
-    );
-    _income.clear();
-    _cushIn.clear();
-    _cushOut.clear();
-    _note.clear();
-    for (final v in [..._exp.values, ..._debts.values, ..._savings.values]) {
-      v.clear();
-    }
-    _toast('День проведён');
   }
 
   @override
@@ -680,205 +608,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Полная запись дня
-          SectionCard(
-            title: 'Полная запись дня',
-            subtitle: 'Доход, траты, долги, накопления и подушка',
-            action: TextButton(
-              onPressed: () => setState(() => _formExpanded = !_formExpanded),
-              child: Text(_formExpanded ? 'Свернуть' : 'Открыть'),
-            ),
-            child: _formExpanded
-                ? _buildFullForm(activeCats, openDebts)
-                : Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'Заполните поля одним касанием — всё в одном месте.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
-                    ),
-                  ),
-          ),
         ],
       ),
     );
   }
-
-  Widget _buildFullForm(List<Category> cats, List<Debt> debts) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            for (final d in [-2, -1, 0, 1])
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: _pill(
-                  d == 0
-                      ? 'Сегодня'
-                      : d == -1
-                      ? 'Вчера'
-                      : d == -2
-                      ? 'Позавчера'
-                      : 'Завтра',
-                  _daysBetween(_entryDate, DateTime.now()) == d,
-                  () => setState(
-                    () => _entryDate = DateTime.now().add(Duration(days: d)),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          readOnly: true,
-          controller: TextEditingController(text: _dateStr(_entryDate)),
-          decoration: const InputDecoration(labelText: 'Дата'),
-        ),
-        const SizedBox(height: 16),
-        const Text('Доход', style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _income,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Сумма, ₽'),
-        ),
-        const SizedBox(height: 16),
-        const Text('Траты', style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        ...cats.map((cat) {
-          _exp.putIfAbsent(cat.id, () => TextEditingController());
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: TextField(
-              controller: _exp[cat.id],
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: cat.name + (cat.need ? ' · обяз.' : ''),
-              ),
-            ),
-          );
-        }),
-        if (debts.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          const Text(
-            'Погашение долгов',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'мин. всего ${fmtRec(debtMinSum(c.state, c.calc))} ₽ / день · '
-            'рек. платёж = остаток ÷ дни до срока',
-            style: TextStyle(fontSize: 11, color: AppTheme.muted),
-          ),
-          const SizedBox(height: 8),
-          ...debts.map((d) {
-            _debts.putIfAbsent(d.id, () => TextEditingController());
-            final rec = debtRec(c.state, c.calc, d);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _debts[d.id],
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: '${d.name} · остаток ${_shown(rec.remain)}',
-                      ),
-                    ),
-                  ),
-                  if (rec.perDay != null && rec.perDay! > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, left: 6),
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 10,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => setState(
-                          () => _debts[d.id]!.text = fmtRec(rec.perDay!),
-                        ),
-                        child: Text(
-                          'рек. ${fmtRec(rec.perDay!)}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }),
-        ],
-        if (c.state.savings.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          const Text(
-            'Накопления и инвестиции',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          ...c.state.savings.where((g) => !g.archived).map((g) {
-            _savings.putIfAbsent(g.id, () => TextEditingController());
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: _savings[g.id],
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: 'Пополнить: ${g.name}'),
-              ),
-            );
-          }),
-        ],
-        const SizedBox(height: 8),
-        const Text('Подушка', style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _cushIn,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Пополнить, ₽'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _cushOut,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Снять, ₽'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _note,
-          decoration: const InputDecoration(labelText: 'Заметка'),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _submitFull,
-            child: const Text('Провести день'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  int _daysBetween(DateTime a, DateTime b) => DateTime(
-    a.year,
-    a.month,
-    a.day,
-  ).difference(DateTime(b.year, b.month, b.day)).inDays;
 
   String _tfKey(String label) =>
       const {

@@ -412,7 +412,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                             ),
                             title: Text(g.name),
                             subtitle: Text(
-                              'Цель ${fmtMoney(target)} ₽${g.plan?.date != null && g.plan!.date.isNotEmpty ? ' · до ${g.plan!.date}' : ''}',
+                              'Цель ${fmtMoney(target)} ₽${g.plan?.date != null && g.plan!.date.isNotEmpty ? ' · до ${fmtDateRu(g.plan!.date)}' : ''}',
                               style: const TextStyle(fontSize: 11),
                             ),
                             trailing: IconButton(
@@ -598,7 +598,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                         style: const TextStyle(fontSize: 13),
                       ),
                       subtitle: Text(
-                        h.date,
+                        fmtDateRu(h.date),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );
@@ -691,7 +691,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(label, style: const TextStyle(fontSize: 13)),
                       subtitle: Text(
-                        h.date,
+                        fmtDateRu(h.date),
                         style: const TextStyle(fontSize: 11),
                       ),
                     );

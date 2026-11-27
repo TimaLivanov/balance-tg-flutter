@@ -8,6 +8,7 @@ import '../services/import_service.dart';
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+import 'report_screen.dart';
 
 class _OpLine {
   final String label;
@@ -27,26 +28,8 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   AppController get c => widget.controller;
 
-  String _dateRu(String iso) {
-    final d = DateTime.tryParse(iso);
-    if (d == null) return iso;
-    const months = [
-      '',
-      'января',
-      'февраля',
-      'марта',
-      'апреля',
-      'мая',
-      'июня',
-      'июля',
-      'августа',
-      'сентября',
-      'октября',
-      'ноября',
-      'декабря',
-    ];
-    return '${d.day} ${months[d.month]} ${d.year}';
-  }
+  /// Отчёт теперь внутри истории: переключатель экономит одну вкладку.
+  int _section = 0;
 
   /// Подробная расшифровка операции: доход, каждая категория расхода,
   /// долг, копилка и подушка — как в HTML-версии.
@@ -338,35 +321,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(
-                  child: ScreenHeader(
-                    eyebrow: 'История',
-                    title: 'Все операции',
-                    subtitle: 'Записи по дням, экспорт и отмена действий',
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ScreenHeader(
+                        eyebrow: _section == 0 ? 'История' : 'Отчёт',
+                        title: _section == 0
+                            ? 'Все операции'
+                            : 'Выгрузка для консультанта',
+                        subtitle: _section == 0
+                            ? 'Записи по дням, экспорт и отмена действий'
+                            : 'Сводка за выбранный период',
+                      ),
+                    ),
+                    if (_section == 0) ...[
+                      IconButton(
+                        tooltip: 'Отменить последнюю',
+                        onPressed: _undoLast,
+                        icon: const Icon(Icons.undo),
+                      ),
+                      IconButton(
+                        tooltip: 'Экспорт',
+                        onPressed: _export,
+                        icon: const Icon(Icons.file_download_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Импорт',
+                        onPressed: _import,
+                        icon: const Icon(Icons.file_upload_outlined),
+                      ),
+                    ],
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Отменить последнюю',
-                  onPressed: _undoLast,
-                  icon: const Icon(Icons.undo),
-                ),
-                IconButton(
-                  tooltip: 'Экспорт',
-                  onPressed: _export,
-                  icon: const Icon(Icons.file_download_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Импорт',
-                  onPressed: _import,
-                  icon: const Icon(Icons.file_upload_outlined),
+                const SizedBox(height: 12),
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 0,
+                      label: Text('История'),
+                      icon: Icon(Icons.history, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: 1,
+                      label: Text('Отчёт'),
+                      icon: Icon(Icons.description_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {_section},
+                  onSelectionChanged: (v) => setState(() => _section = v.first),
+                  showSelectedIcon: false,
                 ),
               ],
             ),
           ),
           Expanded(
-            child: entries.isEmpty
+            child: _section == 1
+                ? ReportScreen(controller: c, showHeader: false)
+                : entries.isEmpty
                 ? Center(
                     child: Text(
                       'Пока нет операций',
@@ -389,7 +403,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      _dateRu(e.date),
+                                      fmtDateRu(e.date),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
@@ -411,8 +425,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         size: 18,
                                       ),
                                       tooltip: 'Редактировать',
-                                      onPressed: () =>
-                                          _toast('Правка доступна на главной'),
+                                      onPressed: () => _toast(
+                                        'Правка доступна в полной записи',
+                                      ),
                                     ),
                                   IconButton(
                                     icon: const Icon(

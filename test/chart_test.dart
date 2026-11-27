@@ -133,7 +133,10 @@ void main() {
         ),
       ),
     );
-    expect(find.textContaining('За период 01.01 — 01.04'), findsOneWidget);
+    expect(
+      find.textContaining('За период 1 января 2026 — 4 января 2026'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Доход'), findsOneWidget);
     expect(find.textContaining('Расход'), findsOneWidget);
     expect(find.textContaining('33%'), findsOneWidget);

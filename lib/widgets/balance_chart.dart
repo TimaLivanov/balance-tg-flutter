@@ -943,10 +943,6 @@ class _FlowStrip extends StatelessWidget {
 
   const _FlowStrip({required this.bars, required this.hideBal});
 
-  static String _date(String value) => value.length >= 10
-      ? '${value.substring(5, 7)}.${value.substring(8, 10)}'
-      : value;
-
   @override
   Widget build(BuildContext context) {
     final income = bars.fold(0.0, (sum, b) => sum + b.income);
@@ -954,9 +950,9 @@ class _FlowStrip extends StatelessWidget {
     final total = income + expense;
     final incomePct = total > 0 ? (income / total * 100).round() : 0;
     final expensePct = total > 0 ? 100 - incomePct : 0;
-    final period = _date(bars.first.date) == _date(bars.last.date)
-        ? _date(bars.first.date)
-        : '${_date(bars.first.date)} — ${_date(bars.last.date)}';
+    final first = fmtDateRu(bars.first.date);
+    final last = fmtDateRu(bars.last.date);
+    final period = first == last ? first : '$first — $last';
 
     return Container(
       color: ChartColors.panel,
@@ -966,9 +962,13 @@ class _FlowStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                'За период $period',
-                style: TextStyle(fontSize: 10, color: ChartColors.label),
+              Expanded(
+                child: Text(
+                  'За период $period',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10, color: ChartColors.label),
+                ),
               ),
               const Spacer(),
               Text(

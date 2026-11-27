@@ -8,7 +8,15 @@ import '../widgets/ui.dart';
 
 class ReportScreen extends StatefulWidget {
   final AppController controller;
-  const ReportScreen({super.key, required this.controller});
+
+  /// При встраивании в «Историю» заголовок рисует родитель.
+  final bool showHeader;
+
+  const ReportScreen({
+    super.key,
+    required this.controller,
+    this.showHeader = true,
+  });
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
@@ -105,12 +113,14 @@ class _ReportScreenState extends State<ReportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ScreenHeader(
-            eyebrow: 'Отчёт',
-            title: 'Выгрузка для консультанта',
-            subtitle: 'Только факты: баланс, долги, доходы и траты',
-          ),
-          const SizedBox(height: 20),
+          if (widget.showHeader) ...[
+            ScreenHeader(
+              eyebrow: 'Отчёт',
+              title: 'Выгрузка для консультанта',
+              subtitle: 'Только факты: баланс, долги, доходы и траты',
+            ),
+            const SizedBox(height: 20),
+          ],
           SectionCard(
             title: 'Отчёт для консультанта',
             subtitle: 'Факты за период: баланс, копилка, подушка, долги, доходы и траты.',

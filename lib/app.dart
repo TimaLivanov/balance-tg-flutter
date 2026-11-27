@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'theme/app_theme.dart';
 import 'state/app_controller.dart';
@@ -15,6 +16,14 @@ class BalanceApp extends StatefulWidget {
 
 class _BalanceAppState extends State<BalanceApp> {
   final _controller = AppController();
+
+  /// Календарь в полной записи должен быть на русском, как остальной интерфейс.
+  static const _delegates = [
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
+  static const _locales = [Locale('ru'), Locale('en')];
 
   @override
   void initState() {
@@ -59,6 +68,9 @@ class _BalanceAppState extends State<BalanceApp> {
             title: 'BitBalance',
             debugShowCheckedModeBanner: false,
             builder: builder,
+            localizationsDelegates: _delegates,
+            supportedLocales: _locales,
+            locale: const Locale('ru'),
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
@@ -71,6 +83,9 @@ class _BalanceAppState extends State<BalanceApp> {
           title: 'BitBalance',
           debugShowCheckedModeBanner: false,
           builder: builder,
+          localizationsDelegates: _delegates,
+          supportedLocales: _locales,
+          locale: const Locale('ru'),
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: AppTheme.isDark ? ThemeMode.dark : ThemeMode.light,
