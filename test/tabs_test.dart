@@ -56,6 +56,7 @@ void main() {
         '${today.year.toString().padLeft(4, '0')}-'
         '${today.month.toString().padLeft(2, '0')}-'
         '${today.day.toString().padLeft(2, '0')}';
+    controller.state.cats.add(Category(id: 'food', name: 'Продукты'));
     controller.state.history.add(
       Entry(
         id: 'edit-1',
@@ -86,6 +87,25 @@ void main() {
 
     expect(find.text('Редактирование операции'), findsOneWidget);
     expect(find.text('Сохранить'), findsOneWidget);
+
+    // Доход 1000 предзаполнен точным числом и не должен обнулиться
+    // после добавления расхода.
+    final incomeField = find.byWidgetPredicate(
+      (w) => w is TextField && w.controller?.text == '1000',
+    );
+    expect(incomeField, findsOneWidget);
+    final expenseField = find.byWidgetPredicate(
+      (w) => w is TextField && w.controller?.text == '300',
+    );
+    expect(expenseField, findsOneWidget);
+    await tester.enterText(expenseField, '500');
+    await tester.ensureVisible(find.text('Сохранить'));
+    await tester.tap(find.text('Сохранить'));
+    await tester.pumpAndSettle();
+
+    final saved = controller.state.history.singleWhere((e) => e.id == 'edit-1');
+    expect(saved.income, 1000);
+    expect(saved.expenses['food'], 500);
     expect(tester.takeException(), isNull);
     controller.dispose();
   });

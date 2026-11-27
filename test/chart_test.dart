@@ -117,9 +117,9 @@ void main() {
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: const BalanceChart(bars: [], showFlow: true, height: 200),
+          body: BalanceChart(bars: [], showFlow: true, height: 200),
         ),
       ),
     );

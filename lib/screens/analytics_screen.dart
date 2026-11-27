@@ -7,6 +7,7 @@ import '../utils/work_stats.dart';
 import '../widgets/balance_chart.dart';
 import '../widgets/heatmap.dart';
 import '../widgets/ui.dart';
+import 'chart_fullscreen_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final AppController controller;
@@ -35,7 +36,13 @@ class _Totals {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _period = 30;
+
+  /// Период только для блока «Доходы по категориям».
+  /// По умолчанию всё время, как просил пользователь.
+  int _incomePeriod = 9999;
   late String _anTf;
+  final _anChartKey = GlobalKey<BalanceChartState>();
+  double _anZoom = 1;
   bool _anCandle = true;
   bool _ma = true;
   bool _expModeIncome = false;
@@ -107,6 +114,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     appToast(context, msg, c.state);
   }
 
+  Future<void> _openFullChart(List<Bar> bars) async {
+    final result = await Navigator.of(context).push<Map<String, double>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ChartFullscreenScreen(
+          controller: c,
+          bars: bars,
+          candle: _anCandle,
+          ma: _ma,
+          showVolume: true,
+          zoom: _anZoom,
+          rightOffset: _anChartKey.currentState?.rightOffset ?? 0,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _anZoom = result['zoom'] ?? _anZoom);
+    _anChartKey.currentState?.setView(
+      zoom: result['zoom'] ?? _anZoom,
+      rightOffset: result['rightOffset'] ?? 0,
+    );
+  }
+
   String _tipOfDay() {
     const tips = [
       'Проверьте обязательные траты: их доля не должна превышать 50% дохода.',
@@ -119,6 +149,44 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final index = DateTime.now().day % tips.length;
     return tips[index];
   }
+
+  ({List<MapEntry<String, double>> rows, double total}) _incomeByCategory(
+    int period,
+  ) {
+    final now = DateTime.now();
+    final today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    final fromKey = period == 9999
+        ? '0000-01-01'
+        : _dateKey(now.subtract(Duration(days: period - 1)));
+    final by = <String, double>{};
+    var total = 0.0;
+    for (final h in c.state.history) {
+      if (h.type != 'day' || h.income <= 0) continue;
+      if (h.date.compareTo(fromKey) < 0 || h.date.compareTo(today) > 0) {
+        continue;
+      }
+      final id = h.incomeCat ?? '1';
+      final name =
+          c.state.incomeCats
+              .where((x) => x.id == id)
+              .map((x) => x.name)
+              .firstOrNull ??
+          'Работа';
+      by[name] = (by[name] ?? 0) + h.income;
+      total += h.income;
+    }
+    final rows = by.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return (rows: rows, total: total);
+  }
+
+  String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   _Totals _calcTotals() {
     final now = DateTime.now();
@@ -270,8 +338,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final bars = buildBars(c.calc.points, _anTf);
     final expBy = t.expBy.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final incBy = t.incBy.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final incomeStats = _incomeByCategory(_incomePeriod);
+    final incBy = incomeStats.rows;
+    final incomeTotal = incomeStats.total;
     final maxExp = expBy.isEmpty ? 1 : expBy.first.value;
     final maxInc = incBy.isEmpty ? 1 : incBy.first.value;
     final health = c.state.health;
@@ -499,6 +568,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       !_anCandle,
                       () => setState(() => _anCandle = false),
                     ),
+                    _pill('⛶', false, () => _openFullChart(bars)),
                   ],
                 ),
                 Padding(
@@ -521,7 +591,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   )
                 else
-                  BalanceChart(bars: bars, candle: _anCandle, ma: _ma),
+                  BalanceChart(
+                    key: _anChartKey,
+                    bars: bars,
+                    candle: _anCandle,
+                    ma: _ma,
+                    zoom: _anZoom,
+                    onZoomChanged: (v) => setState(() => _anZoom = v),
+                  ),
               ],
             ),
           ),
@@ -868,12 +945,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
           SectionCard(
             title: 'Доходы по категориям',
-            subtitle: inc > 0 ? 'Всего ${fmtMoney(inc)} ₽' : 'нет данных',
+            subtitle: incomeTotal > 0
+                ? 'Всего ${fmtMoney(incomeTotal)} ₽'
+                : 'нет данных',
+            action: DropdownButton<int>(
+              value: _incomePeriod,
+              isDense: true,
+              items: const [
+                DropdownMenuItem(value: 7, child: Text('Неделя')),
+                DropdownMenuItem(value: 30, child: Text('Месяц')),
+                DropdownMenuItem(value: 365, child: Text('Год')),
+                DropdownMenuItem(value: 9999, child: Text('Всё время')),
+              ],
+              onChanged: (v) => setState(() => _incomePeriod = v ?? 9999),
+            ),
             child: incBy.isEmpty
                 ? const _NoData()
                 : Column(
                     children: incBy.map((e) {
-                      final pct = inc > 0 ? e.value / inc : 0.0;
+                      final pct = incomeTotal > 0 ? e.value / incomeTotal : 0.0;
                       return _barRow(
                         e.key,
                         e.value,

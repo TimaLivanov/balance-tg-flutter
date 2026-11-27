@@ -4,6 +4,7 @@ import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/balance_chart.dart';
 import '../widgets/ui.dart';
+import 'chart_fullscreen_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final AppController controller;
@@ -124,6 +125,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _toast(String msg) {
     if (!mounted) return;
     appToast(context, msg, c.state);
+  }
+
+  Future<void> _openFullChart(List<Bar> bars) async {
+    final result = await Navigator.of(context).push<Map<String, double>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ChartFullscreenScreen(
+          controller: c,
+          bars: bars,
+          candle: _candle,
+          ma: _ma,
+          showVolume: _volume,
+          zoom: _zoom,
+          rightOffset: _chartKey.currentState?.rightOffset ?? 0,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _zoom = result['zoom'] ?? _zoom);
+    _chartKey.currentState?.setView(
+      zoom: result['zoom'] ?? _zoom,
+      rightOffset: result['rightOffset'] ?? 0,
+    );
   }
 
   @override
@@ -460,6 +484,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 '↺',
                                 false,
                                 () => _chartKey.currentState?.resetZoom(),
+                              ),
+                              _terminalPill(
+                                '⛶',
+                                false,
+                                () => _openFullChart(bars),
                               ),
                             ],
                           ),

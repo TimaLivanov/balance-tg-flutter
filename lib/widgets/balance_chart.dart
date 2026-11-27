@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
@@ -221,6 +220,9 @@ class BalanceChart extends StatefulWidget {
   /// с жестом щипка.
   final ValueChanged<double>? onZoomChanged;
 
+  /// Для полноэкранного режима: сохраняем окно и сдвиг по истории.
+  final double initialRightOffset;
+
   const BalanceChart({
     super.key,
     required this.bars,
@@ -232,6 +234,7 @@ class BalanceChart extends StatefulWidget {
     this.showSummary = true,
     this.showFlow = false,
     this.hideBal = false,
+    this.initialRightOffset = 0,
     this.onZoomChanged,
   });
 
@@ -260,6 +263,7 @@ class BalanceChartState extends State<BalanceChart> {
   void initState() {
     super.initState();
     _barCount = _boundedCount((_baseCount / widget.zoom).round());
+    _rightOffset = widget.initialRightOffset.clamp(0, _maxOffset).toDouble();
   }
 
   @override
@@ -267,11 +271,27 @@ class BalanceChartState extends State<BalanceChart> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.bars.length != widget.bars.length ||
         oldWidget.zoom != widget.zoom) {
-      // При смене таймфрейма сохраняем масштаб относительно нового окна.
+      _cursor.value = null;
       final factor = _baseCountFor(oldWidget.bars.length) / _barCount;
-      _commitCount((_baseCount / factor).round());
+      // Пересчитываем окно сразу, иначе один кадр показываются старые свечи.
+      // Родителю не сообщаем: setState во время его build недопустим.
+      _commitCount((_baseCount / factor).round(), notify: false);
     }
   }
+
+  /// Восстановить окно после возврата из полноэкранного режима.
+  void setView({required double zoom, required double rightOffset}) {
+    final next = _boundedCount((_baseCount / zoom).round());
+    final maxOffset = math.max(0, widget.bars.length - next).toDouble();
+    setState(() {
+      _barCount = next;
+      _rightOffset = rightOffset.clamp(0, maxOffset).toDouble();
+    });
+    widget.onZoomChanged?.call(zoomFactor);
+  }
+
+  double get currentZoom => zoomFactor;
+  double get rightOffset => _rightOffset;
 
   /// За базу берём все доступные свечи, но не больше 60. Раньше база была
   /// фиксированной, поэтому на 14 днях кнопки масштаба визуально ничего
@@ -307,10 +327,11 @@ class BalanceChartState extends State<BalanceChart> {
     _pinnedCandle.value = found >= start && found < end ? found - start : null;
   }
 
-  void _commitCount(int count) {
+  void _commitCount(int count, {bool notify = true}) {
     final next = _boundedCount(count);
     if (next == _barCount) return;
     final (oldStart, oldEnd) = _window();
+    _cursor.value = null;
     setState(() {
       _barCount = next;
       _rightOffset = _rightOffset
@@ -318,7 +339,7 @@ class BalanceChartState extends State<BalanceChart> {
           .toDouble();
     });
     _rebasePinned(oldStart, oldEnd);
-    widget.onZoomChanged?.call(zoomFactor);
+    if (notify) widget.onZoomChanged?.call(zoomFactor);
   }
 
   void zoomIn() => _commitCount((_barCount / 1.25).round());
@@ -327,9 +348,13 @@ class BalanceChartState extends State<BalanceChart> {
 
   void resetZoom() {
     final (oldStart, oldEnd) = _window();
-    setState(() => _rightOffset = 0);
+    _cursor.value = null;
+    setState(() {
+      _rightOffset = 0;
+      _barCount = _boundedCount(_baseCount);
+    });
     _rebasePinned(oldStart, oldEnd);
-    _commitCount(_baseCount);
+    widget.onZoomChanged?.call(zoomFactor);
   }
 
   @override
@@ -396,6 +421,8 @@ class BalanceChartState extends State<BalanceChart> {
           _pointers[e.pointer] = e.localPosition;
           _cursor.value = e.localPosition;
           if (_pointers.length == 2) {
+            // Старый crosshair при щипке остаётся на месте — убираем его.
+            _cursor.value = null;
             final p = _pointers.values.toList();
             _pinchDistance = (p[0] - p[1]).distance;
             _pinchStartCount = _barCount.toDouble();
@@ -417,8 +444,8 @@ class BalanceChartState extends State<BalanceChart> {
             _setCandle(e.localPosition);
           }
         },
-        onPointerUp: (e) => _endPointer(e.pointer),
-        onPointerCancel: (e) => _endPointer(e.pointer),
+        onPointerUp: (e) => _endPointer(e.pointer, e.kind),
+        onPointerCancel: (e) => _endPointer(e.pointer, e.kind),
         onPointerHover: (e) {
           _cursor.value = e.localPosition;
           _setCandle(e.localPosition);
@@ -501,13 +528,17 @@ class BalanceChartState extends State<BalanceChart> {
     );
   }
 
-  void _endPointer(int pointer) {
+  void _endPointer(int pointer, PointerDeviceKind kind) {
     _pointers.remove(pointer);
     if (_pointers.length < 2) {
       _pinchDistance = null;
       _pinchStartCount = null;
     }
-    if (_pointers.isEmpty && !kIsWeb) _cursor.value = null;
+    // На вебе курсор после касания тоже нужно сбрасывать, иначе старая
+    // подпись даты и цены остаётся поверх нового масштаба.
+    if (_pointers.isEmpty && kind != PointerDeviceKind.mouse) {
+      _cursor.value = null;
+    }
   }
 }
 
@@ -553,7 +584,13 @@ class _BalanceChartPainter extends CustomPainter {
 
     _calcRange();
 
-    _drawGrid(canvas, size);
+    final idx = _cursorIndex();
+    final legendIdx = (pinnedCandle ?? idx ?? bars.length - 1).clamp(
+      0,
+      bars.length - 1,
+    );
+    // Сетка не должна рисовать ещё одну подпись поверх бейджа свечи.
+    _drawGrid(canvas, size, skipLabels: {if (idx != null) idx, legendIdx});
     if (showVolume) _drawVolume(canvas);
     if (candle) {
       _drawCandles(canvas);
@@ -566,9 +603,7 @@ class _BalanceChartPainter extends CustomPainter {
       _drawMa(canvas, 28, ChartColors.ma28);
     }
 
-    final idx = _cursorIndex();
     if (idx != null) _drawCrosshair(canvas, size, idx);
-    final legendIdx = pinnedCandle ?? idx ?? bars.length - 1;
     if (ma) _drawMaLegend(canvas, legendIdx);
     _drawCandleMarker(canvas, legendIdx);
   }
@@ -650,7 +685,11 @@ class _BalanceChartPainter extends CustomPainter {
     return tp.width;
   }
 
-  void _drawGrid(Canvas canvas, Size size) {
+  /// Подпись не должна заезжать на правую ось цены при любом зуме.
+  double _labelX(int i) =>
+      (padL + (i + 0.5) * cell).clamp(padL + 18, padL + plotW - 18);
+
+  void _drawGrid(Canvas canvas, Size size, {required Set<int> skipLabels}) {
     final vertical = Paint()
       ..color = ChartColors.gridSoft
       ..strokeWidth = 1;
@@ -658,20 +697,23 @@ class _BalanceChartPainter extends CustomPainter {
       ..color = ChartColors.grid
       ..strokeWidth = 1;
 
-    // Вертикальная сетка и подписи времени — как в нижней оси скриншота.
-    final labelEvery = bars.length > 20
-        ? (bars.length / 7).ceil()
-        : bars.length > 12
-        ? 2
-        : 1;
+    // При зуме ячейка становится узкой: реже линии и подписи, иначе они
+    // сливаются и выглядят как артефакты.
+    final labelEvery = math.max(
+      (bars.length / 7).ceil(),
+      cell > 0 ? (36 / cell).ceil() : 1,
+    );
     for (var i = 0; i < bars.length; i++) {
       final x = padL + (i + 0.5) * cell;
-      canvas.drawLine(Offset(x, padT), Offset(x, padT + plotH), vertical);
-      if (i % labelEvery == 0 || i == bars.length - 1) {
+      if (cell >= 8) {
+        canvas.drawLine(Offset(x, padT), Offset(x, padT + plotH), vertical);
+      }
+      if ((i % labelEvery == 0 || i == bars.length - 1) &&
+          !skipLabels.contains(i)) {
         _text(
           canvas,
           bars[i].label,
-          Offset(x - 18, padT + plotH + 6),
+          Offset(_labelX(i) - 18, padT + plotH + 6),
           color: ChartColors.label,
           size: 9,
           align: TextAlign.center,
@@ -730,7 +772,7 @@ class _BalanceChartPainter extends CustomPainter {
     final maxVol = bars.map((b) => b.volume).reduce(math.max);
     if (maxVol <= 1) return;
     final h = plotH * 0.16;
-    final bw = math.max(2.0, cell * 0.7);
+    final bw = math.max(1.0, math.min(cell * 0.8, 18.0));
     for (var i = 0; i < bars.length; i++) {
       final b = bars[i];
       final bh = b.volume / maxVol * h;
@@ -749,19 +791,21 @@ class _BalanceChartPainter extends CustomPainter {
   }
 
   void _drawCandles(Canvas canvas) {
-    final bw = (cell * 0.72).clamp(2.5, 18.0);
+    final bw = math.max(1.0, math.min(cell * 0.8, 18.0));
     for (var i = 0; i < bars.length; i++) {
       final b = bars[i];
       final up = b.close >= b.open;
       final color = up ? ChartColors.up : ChartColors.down;
       final cx = padL + (i + 0.5) * cell;
-      canvas.drawLine(
-        Offset(cx, yOf(b.high)),
-        Offset(cx, yOf(b.low)),
-        Paint()
-          ..color = color
-          ..strokeWidth = 1.2,
-      );
+      if (cell >= 3) {
+        canvas.drawLine(
+          Offset(cx, yOf(b.high)),
+          Offset(cx, yOf(b.low)),
+          Paint()
+            ..color = color
+            ..strokeWidth = 1.2,
+        );
+      }
       final top = yOf(math.max(b.open, b.close));
       final bottom = yOf(math.min(b.open, b.close));
       canvas.drawRect(
@@ -852,7 +896,7 @@ class _BalanceChartPainter extends CustomPainter {
     _text(
       canvas,
       b.label,
-      Offset(x - 18, padT + plotH + 6),
+      Offset(_labelX(idx) - 18, padT + plotH + 6),
       color: Colors.white,
       size: 9,
       align: TextAlign.center,
@@ -863,7 +907,7 @@ class _BalanceChartPainter extends CustomPainter {
 
   void _drawCandleMarker(Canvas canvas, int idx) {
     final b = bars[idx];
-    final x = padL + (idx + 0.5) * cell;
+    final x = _labelX(idx);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(x - 18, padT + plotH + 3, 36, 16),

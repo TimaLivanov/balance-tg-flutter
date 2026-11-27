@@ -9,7 +9,10 @@ void main() {
   testWidgets('добавление времени уведомления видно сразу', (tester) async {
     final c = AppController();
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: HomeScreen(controller: c)),
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: HomeScreen(controller: c),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -27,11 +30,13 @@ void main() {
     c.dispose();
   });
 
-  testWidgets('переключатель «Не исчезать» работает сразу',
-      (tester) async {
+  testWidgets('переключатель «Не исчезать» работает сразу', (tester) async {
     final c = AppController();
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.light(), home: HomeScreen(controller: c)),
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: HomeScreen(controller: c),
+      ),
     );
     await tester.pumpAndSettle();
 

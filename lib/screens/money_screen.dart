@@ -531,14 +531,17 @@ class _MoneyScreenState extends State<MoneyScreen> {
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ...archivedDebts.map(
-                          (d) => ListTile(
+                        ...archivedDebts.map((d) {
+                          final remain = calc.debtRemain[d.id] ?? 0;
+                          return ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text('Долг: ${d.name}'),
                             subtitle: Text(
-                              'остаток был ${fmtMoney(calc.debtRemain[d.id] ?? 0)} ₽ · '
-                              '${(calc.debtRemain[d.id] ?? 0) <= 0.004 ? 'долг погашен' : 'долг в архиве'}'
-                              '${d.archivedAt.isNotEmpty ? ' · ${fmtDateRu(d.archivedAt)}' : ''}',
+                              'сумма ${_shown(d.amount)} · '
+                              'погашено ${_shown(d.amount - remain)} · '
+                              '${remain <= 0.004 ? 'погашен' : 'остаток ${_shown(remain)}'} · '
+                              'открыт ${d.date.isNotEmpty ? fmtDateRu(d.date) : 'дата не сохранена'} · '
+                              'закрыт ${d.archivedAt.isNotEmpty ? fmtDateRu(d.archivedAt) : 'дата не сохранена'}',
                               style: const TextStyle(fontSize: 11),
                             ),
                             trailing: TextButton(
@@ -546,8 +549,8 @@ class _MoneyScreenState extends State<MoneyScreen> {
                                   c.updateDebt(d.id, archived: false),
                               child: const Text('Вернуть'),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                         ...archivedCats.map(
                           (x) => Text(
                             'Категория: ${x.name}',

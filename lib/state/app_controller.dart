@@ -406,6 +406,7 @@ class AppController extends ChangeNotifier {
     final idx = _state.debts.indexWhere((d) => d.id == id);
     if (idx < 0) return;
     final d = _state.debts[idx];
+    final nextArchived = archived ?? d.archived;
     _state.debts[idx] = Debt(
       id: d.id,
       name: name ?? d.name,
@@ -413,8 +414,10 @@ class AppController extends ChangeNotifier {
       due: due ?? d.due,
       date: d.date,
       rate: d.rate,
-      archived: archived ?? d.archived,
-      archivedAt: d.archivedAt,
+      archived: nextArchived,
+      archivedAt: nextArchived
+          ? (d.archivedAt.isNotEmpty ? d.archivedAt : _dateKey(DateTime.now()))
+          : '',
     );
     commit();
   }
@@ -524,7 +527,7 @@ class AppController extends ChangeNotifier {
     commit();
   }
 
-  Future<String> askAi(String question, String context) async {
+  Future<String> askAi(String question, Map<String, dynamic> context) async {
     try {
       final res = await _api.post('/api/ai', {
         'question': question,
@@ -541,52 +544,190 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  String buildAiContext() {
+  /// Контекст для /api/ai должен быть объектом: worker игнорирует строку.
+  /// Передаём актуальные деньги, а не только суммы за всю историю.
+  Map<String, dynamic> buildAiContext() {
     final c = _calc;
-    final topExp = <MapEntry<String, double>>[];
-    for (final e in _state.history) {
-      if (e.type != 'day') continue;
-      e.expenses.forEach((k, v) {
-        final name =
-            _state.cats
-                .where((x) => x.id == k)
+    final now = DateTime.now();
+    final today = _dateKey(now);
+    final from = _dateKey(now.subtract(const Duration(days: 6)));
+    final monthFrom = _dateKey(now.subtract(const Duration(days: 29)));
+
+    double sumIncome(String fromKey) {
+      var sum = 0.0;
+      for (final h in _state.history) {
+        if (h.type == 'day' &&
+            h.date.compareTo(fromKey) >= 0 &&
+            h.date.compareTo(today) <= 0) {
+          sum += h.income;
+        }
+      }
+      return sum;
+    }
+
+    double sumExpense(String fromKey) {
+      var sum = 0.0;
+      for (final h in _state.history) {
+        if (h.type != 'day' ||
+            h.date.compareTo(fromKey) < 0 ||
+            h.date.compareTo(today) > 0) {
+          continue;
+        }
+        sum +=
+            h.expenses.values.fold(0.0, (a, b) => a + b) +
+            h.debtPays.values.fold(0.0, (a, b) => a + b) +
+            h.savSpend.values.fold(0.0, (a, b) => a + b) +
+            h.cushOut;
+      }
+      return sum;
+    }
+
+    final expBy = <String, double>{};
+    final incBy = <String, double>{};
+    final funded = <String, double>{};
+    for (final h in _state.history) {
+      if (h.type == 'day') {
+        h.expenses.forEach((id, v) {
+          final name =
+              _state.cats
+                  .where((x) => x.id == id)
+                  .map((x) => x.name)
+                  .firstOrNull ??
+              id;
+          expBy[name] = (expBy[name] ?? 0) + v;
+        });
+        final incName =
+            _state.incomeCats
+                .where((x) => x.id == (h.incomeCat ?? '1'))
                 .map((x) => x.name)
                 .firstOrNull ??
-            k;
-        final idx = topExp.indexWhere((x) => x.key == name);
-        if (idx >= 0) {
-          topExp[idx] = MapEntry(name, topExp[idx].value + v);
-        } else {
-          topExp.add(MapEntry(name, v));
+            'Работа';
+        if (h.income > 0) {
+          incBy[incName] = (incBy[incName] ?? 0) + h.income;
         }
-      });
+      }
+      h.savings.forEach((id, v) => funded[id] = (funded[id] ?? 0) + v);
+      h.savSpend.forEach((id, v) => funded[id] = (funded[id] ?? 0) - v);
     }
-    topExp.sort((a, b) => b.value.compareTo(a.value));
-    final exp = topExp
-        .take(8)
-        .map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}')
-        .join(', ');
+
+    List<Map<String, dynamic>> top(Map<String, double> src) {
+      final entries = src.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      return entries
+          .take(8)
+          .map((e) => {'name': e.key, 'amount': (e.value * 100).round() / 100})
+          .toList();
+    }
+
+    final recent = List<Entry>.from(_state.history)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final limit = _state.recentOpsLimit < 1 ? 10 : _state.recentOpsLimit;
+    final recentOps = recent.take(limit).map((h) {
+      final expNames = h.expenses.entries
+          .where((e) => e.value > 0)
+          .map((e) {
+            final name =
+                _state.cats
+                    .where((x) => x.id == e.key)
+                    .map((x) => x.name)
+                    .firstOrNull ??
+                e.key;
+            return '$name ${e.value.toStringAsFixed(0)}';
+          })
+          .join(', ');
+      return {
+        'date': h.date,
+        'income': (h.income * 100).round() / 100,
+        'expenses': expNames,
+        'note': h.note,
+        'type': h.type,
+      };
+    }).toList();
+
     final debts = _state.debts
-        .where((d) => !d.archived && (c.debtRemain[d.id] ?? d.amount) > 0)
-        .take(12)
+        .where((d) => !d.archived && (c.debtRemain[d.id] ?? d.amount) > 0.004)
         .map((d) {
           final remain = c.debtRemain[d.id] ?? d.amount;
-          final overdue =
-              d.due.isNotEmpty && d.due.compareTo(_dateKey(DateTime.now())) < 0;
-          return '${d.name}: осталось ${remain.toStringAsFixed(0)}'
-              '${d.due.isNotEmpty ? ', срок ${d.due}${overdue ? ' (просрочен)' : ''}' : ''}';
+          return {
+            'name': d.name,
+            'remain': (remain * 100).round() / 100,
+            'due': d.due,
+            'overdue': d.due.isNotEmpty && d.due.compareTo(today) < 0,
+          };
         })
-        .join(', ');
-    return 'Баланс: ${c.balance.toStringAsFixed(0)}\n'
-        'Наличные: ${c.cash.toStringAsFixed(0)}\n'
-        'Подушка: ${c.cushion.toStringAsFixed(0)} из ${c.cushionGoal.toStringAsFixed(0)}\n'
-        'Долги: ${c.debtTotal.toStringAsFixed(0)}\n'
-        'Доходы: ${c.income.toStringAsFixed(0)}\n'
-        'Расходы: ${c.expenses.toStringAsFixed(0)}\n'
-        'Топ трат: $exp\n'
-        'Долги: $debts\n'
-        'Окно среднего: ${_state.windowDays} дней\n'
-        'Режим: ${_state.aiBehavior}';
+        .toList();
+
+    return {
+      'today': today,
+      'windowDays': _state.windowDays,
+      'behavior': _state.aiBehavior,
+      'balance': (c.balance * 100).round() / 100,
+      'cash': (c.cash * 100).round() / 100,
+      'savingsTotal': (c.savingsTotal * 100).round() / 100,
+      'cushion': {
+        'current': (c.cushion * 100).round() / 100,
+        'goal': (c.cushionGoal * 100).round() / 100,
+        'remaining': (c.cushionRemaining * 100).round() / 100,
+        'pct': (c.cushionPct * 10).round() / 10,
+        'recPerDay': (c.cushionRecPerDay * 100).round() / 100,
+        'months': _state.cushionMonths,
+        'baseMode': _state.cushionBase,
+      },
+      'debts': {
+        'total': (c.debtTotal * 100).round() / 100,
+        'paid': (c.debtPaid * 100).round() / 100,
+        'open': debts,
+      },
+      'income': {
+        'allTime': (c.income * 100).round() / 100,
+        'last7d': (sumIncome(from) * 100).round() / 100,
+        'last30d': (sumIncome(monthFrom) * 100).round() / 100,
+        'byCategory': top(incBy),
+      },
+      'expenses': {
+        'allTime': (c.expenses * 100).round() / 100,
+        'last7d': (sumExpense(from) * 100).round() / 100,
+        'last30d': (sumExpense(monthFrom) * 100).round() / 100,
+        'byCategory': top(expBy),
+      },
+      'categories': _state.cats
+          .where((x) => !x.archived)
+          .map(
+            (x) => {
+              'name': x.name,
+              'need': x.need,
+              'rare': x.rare,
+              'planAmount': x.plan?.amount ?? 0,
+              'planDate': x.plan?.date ?? '',
+            },
+          )
+          .toList(),
+      'savings': _state.savings
+          .where((g) => !g.archived)
+          .map(
+            (g) => {
+              'name': g.name,
+              'kind': g.kind,
+              'current': ((funded[g.id] ?? 0) * 100).round() / 100,
+              'planAmount': g.plan?.amount ?? 0,
+              'planDate': g.plan?.date ?? '',
+            },
+          )
+          .toList(),
+      'budget': {
+        'needs': _state.budget.needs,
+        'wants': _state.budget.wants,
+        'goals': _state.budget.goals,
+        'cushion': _state.budget.cushion,
+      },
+      'health': {
+        'needsMax': _state.health.needsMax,
+        'saveMin': _state.health.saveMin,
+        'runwayMin': _state.health.runwayMin,
+        'debtMonths': _state.health.debtMonths,
+      },
+      'recentOperations': recentOps,
+    };
   }
 
   Future<String> loadAiMemory() async {

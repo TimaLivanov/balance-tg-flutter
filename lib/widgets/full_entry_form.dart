@@ -48,21 +48,24 @@ class _FullEntryFormState extends State<FullEntryForm> {
     final edit = widget.editing;
     if (edit != null) {
       _entryDate = DateTime.tryParse(edit.date) ?? DateTime.now();
-      _income.text = edit.income > 0 ? fmtRec(edit.income) : '';
-      _cushIn.text = edit.cushIn > 0 ? fmtRec(edit.cushIn) : '';
-      _cushOut.text = edit.cushOut > 0 ? fmtRec(edit.cushOut) : '';
+      _income.text = edit.income > 0 ? _inputAmount(edit.income) : '';
+      _cushIn.text = edit.cushIn > 0 ? _inputAmount(edit.cushIn) : '';
+      _cushOut.text = edit.cushOut > 0 ? _inputAmount(edit.cushOut) : '';
       _note.text = edit.note;
       _exp.addAll({
         for (final e in edit.expenses.entries)
-          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+          if (e.value > 0)
+            e.key: TextEditingController(text: _inputAmount(e.value)),
       });
       _debts.addAll({
         for (final e in edit.debtPays.entries)
-          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+          if (e.value > 0)
+            e.key: TextEditingController(text: _inputAmount(e.value)),
       });
       _savings.addAll({
         for (final e in edit.savings.entries)
-          if (e.value > 0) e.key: TextEditingController(text: fmtRec(e.value)),
+          if (e.value > 0)
+            e.key: TextEditingController(text: _inputAmount(e.value)),
       });
     }
     _dateCtrl.text = fmtDateRu(_dateStr(_entryDate));
@@ -90,8 +93,16 @@ class _FullEntryFormState extends State<FullEntryForm> {
   static String _dateStr(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  /// Точное значение для поля ввода: без пробелов разрядов и без округления
+  /// до сотен, которое применяют рекомендации.
+  static String _inputAmount(double v) =>
+      v.toStringAsFixed(v == v.roundToDouble() ? 0 : 2);
+
   double _num(TextEditingController ctrl) =>
-      double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
+      double.tryParse(
+        ctrl.text.replaceAll(RegExp(r'[\s\u00A0]'), '').replaceAll(',', '.'),
+      ) ??
+      0;
 
   String _shown(double v, {String suffix = ' ₽'}) =>
       c.state.hideBal ? '••••' : '${fmtMoney(v)}$suffix';
